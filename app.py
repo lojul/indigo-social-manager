@@ -51,6 +51,7 @@ def get_secret(key, default=""):
 BUFFER_API_URL = "https://api.buffer.com/rpc"
 IMGBB_API_KEY = get_secret("IMGBB_API_KEY", "")
 BUFFER_API_TOKEN = get_secret("BUFFER_API_TOKEN", "")
+OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY", "")
 
 # Brand colors
 THEMES = {
@@ -187,6 +188,73 @@ def upload_to_imgbb(image_base64, api_key):
     if not data.get('success'):
         raise Exception(f"Upload failed: {data.get('error', {}).get('message', 'Unknown')}")
     return data['data']['url']
+
+
+# ============================================================================
+# AI Content Generation
+# ============================================================================
+
+AI_SYSTEM_PROMPT = """你是青藍科技 (Indigo Foundry) 的社交媒體內容創作者，專門為香港和台灣的Facebook用戶設計科技相關貼文。
+
+你的任務是根據提供的主題，創建吸引人的Facebook貼文。
+
+要求：
+1. 貼文長度：150-280字
+2. 使用繁體中文
+3. 包含2-4個相關emoji，自然地融入文字中
+4. 語氣專業但親切、有趣、引發討論
+5. 結尾加入互動問題或行動呼籲
+6. 聚焦於：AI趨勢、Odoo ERP、數位轉型、科技新聞
+
+風格指南：
+- 開頭要吸引眼球
+- 內容要有觀點但不偏激
+- 適當使用換行增加可讀性
+- 語氣像是專業顧問分享見解
+
+避免：
+- 政治敏感話題
+- 過於銷售導向的語氣
+- 虛假或未經證實的資訊"""
+
+
+def generate_ai_content(topic, api_key=None):
+    """Generate post content using OpenRouter API"""
+    api_key = api_key or OPENROUTER_API_KEY
+    if not api_key:
+        return None, "OpenRouter API key not configured"
+
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "anthropic/claude-3-haiku",
+                "messages": [
+                    {"role": "system", "content": AI_SYSTEM_PROMPT},
+                    {"role": "user", "content": f"請根據以下主題創建一則Facebook貼文：\n\n{topic}"}
+                ],
+                "temperature": 0.8,
+                "max_tokens": 500,
+            },
+            timeout=30
+        )
+
+        data = response.json()
+
+        if 'error' in data:
+            return None, f"API Error: {data['error'].get('message', 'Unknown error')}"
+
+        content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+        if content:
+            return content.strip(), None
+        return None, "Empty response from AI"
+
+    except Exception as e:
+        return None, f"Error: {str(e)}"
 
 
 # ============================================================================
@@ -429,9 +497,33 @@ def render_create_post(buffer_token, channel_id):
     with col1:
         st.subheader("Post Content")
 
-        # Post text
+        # AI Generation section
+        with st.expander("🤖 AI 生成貼文", expanded=True):
+            ai_topic = st.text_input(
+                "輸入主題",
+                placeholder="例如：Agentic AI 趨勢、Odoo 20 新功能、ERP數位轉型...",
+                key="ai_topic"
+            )
+
+            if st.button("✨ AI 生成", type="secondary", use_container_width=True):
+                if not ai_topic:
+                    st.warning("請輸入主題")
+                elif not OPENROUTER_API_KEY:
+                    st.error("請在 secrets 中設定 OPENROUTER_API_KEY")
+                else:
+                    with st.spinner("AI 正在生成內容..."):
+                        content, error = generate_ai_content(ai_topic)
+                        if content:
+                            st.session_state['generated_text'] = content
+                            st.success("生成成功！")
+                        else:
+                            st.error(error)
+
+        # Post text - use generated text if available
+        default_text = st.session_state.get('generated_text', '')
         post_text = st.text_area(
             "Post Text",
+            value=default_text,
             height=150,
             placeholder="輸入貼文內容...\n\n例如：2026年，AI不再只是工具，而是你的工作夥伴！",
             help="The caption for your Facebook post"
