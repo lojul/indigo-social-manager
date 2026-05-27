@@ -203,9 +203,19 @@ def wrap_text(draw, text, font, max_width):
     if line: lines.append(line)
     return lines
 
-def generate_image(headline, theme='indigo', hashtags=None):
+IMAGE_SIZES = {
+    'facebook': {'w': 1200, 'h': 630, 'name': 'Facebook (1200x630)'},
+    'instagram': {'w': 1080, 'h': 1080, 'name': 'Instagram (1080x1080)'},
+    'story': {'w': 1080, 'h': 1920, 'name': 'Story (1080x1920)'},
+}
+
+def generate_image(headline, theme='indigo', hashtags=None, size='facebook'):
     if not PIL_AVAILABLE: return None
-    W, H, M = 1200, 630, 60
+
+    dims = IMAGE_SIZES.get(size, IMAGE_SIZES['facebook'])
+    W, H = dims['w'], dims['h']
+    M = 60 if size == 'facebook' else 80
+
     colors = THEMES.get(theme, THEMES['indigo'])
     img = Image.new('RGB', (W, H), hex_to_rgb(colors['bg']))
     draw = ImageDraw.Draw(img)
@@ -216,10 +226,12 @@ def generate_image(headline, theme='indigo', hashtags=None):
     draw.line([(W-M, H-M), (W-M-100, H-M)], fill=accent, width=3)
     draw.line([(W-M, H-M), (W-M, H-M-100)], fill=accent, width=3)
 
-    font = get_font(52)
+    # Adjust font size based on image size
+    font_size = 52 if size == 'facebook' else (48 if size == 'instagram' else 56)
+    font = get_font(font_size)
     text_color = hex_to_rgb(colors['text'])
     lines = wrap_text(draw, headline, font, W - M*2)
-    lh = 70
+    lh = font_size + 18
     y = (H * 0.45) - (len(lines) * lh / 2)
     for i, line in enumerate(lines):
         bbox = draw.textbbox((0,0), line, font=font)
@@ -255,11 +267,24 @@ def upload_to_imgbb(b64):
 
 def search_trends(category):
     if not TAVILY_API_KEY: return [], "TAVILY_API_KEY not set"
+
+    # Check if we already have results to avoid extra API calls
+    cache_key = f"cache_{category}"
+    if cache_key in st.session_state:
+        return st.session_state[cache_key], None
+
     queries = {"AI": "AI trends 2026", "Odoo": "Odoo ERP 2026", "Tech": "technology trends 2026"}
     try:
-        r = requests.post("https://api.tavily.com/search", json={"api_key": TAVILY_API_KEY, "query": queries.get(category, "AI trends"), "max_results": 6}, timeout=30)
+        r = requests.post("https://api.tavily.com/search", json={
+            "api_key": TAVILY_API_KEY,
+            "query": queries.get(category, "AI trends"),
+            "max_results": 5,  # Reduced to save API quota
+            "search_depth": "basic"
+        }, timeout=30)
         d = r.json()
-        return [{'title': x['title'], 'summary': x.get('content','')[:150]} for x in d.get('results', [])], None
+        results = [{'title': x['title'], 'summary': x.get('content','')[:120]} for x in d.get('results', [])]
+        st.session_state[cache_key] = results  # Cache results
+        return results, None
     except Exception as e:
         return [], str(e)
 
@@ -269,18 +294,48 @@ def buffer_request(query, variables=None):
 
 def get_channel():
     r = buffer_request("query { account { organizations { id } } }")
-    if not r or 'data' not in r: return None, None
+    if not r:
+        return None, [], "Token not configured"
+    if 'errors' in r:
+        err_msg = r['errors'][0].get('message', 'API Error')
+        return None, [], err_msg
+    if 'data' not in r:
+        return None, [], "No data"
     orgs = r['data'].get('account', {}).get('organizations', [])
-    if not orgs: return None, None
+    if not orgs:
+        return None, [], "No organizations"
     org_id = orgs[0]['id']
     r = buffer_request("query($i: ChannelsInput!) { channels(input: $i) { id name } }", {'i': {'organizationId': org_id}})
+    if r and 'errors' in r:
+        return None, [], r['errors'][0].get('message', 'API Error')
     channels = r.get('data', {}).get('channels', []) if r else []
-    return channels[0] if channels else None, channels
+    return channels[0] if channels else None, channels, None
 
 def create_post(channel_id, text, image_url):
     inp = {'channelId': channel_id, 'schedulingType': 'automatic', 'mode': 'addToQueue', 'text': text, 'metadata': {'facebook': {'type': 'post'}}}
     if image_url: inp['assets'] = {'images': [{'url': image_url}]}
     return buffer_request("mutation($i: CreatePostInput!) { createPost(input: $i) { __typename ... on PostActionSuccess { post { id } } ... on UnexpectedError { message } } }", {'i': inp})
+
+def translate_to_chinese(text):
+    """Translate text to Chinese using free Google Translate API"""
+    try:
+        # Use Google Translate unofficial API
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            "client": "gtx",
+            "sl": "en",
+            "tl": "zh-TW",
+            "dt": "t",
+            "q": text[:200]  # Limit length
+        }
+        r = requests.get(url, params=params, timeout=10)
+        result = r.json()
+        if result and result[0]:
+            translated = ''.join([part[0] for part in result[0] if part[0]])
+            return translated[:80]  # Limit to ~40 chars for image
+    except:
+        pass
+    return text[:80]
 
 # ============================================================================
 # App
@@ -299,7 +354,7 @@ def render_stepper(step):
 
 def main():
     # Header
-    col1, col2 = st.columns([6, 1])
+    col1, col2 = st.columns([5, 2])
     with col1:
         st.markdown("""
         <div class="app-header">
@@ -308,10 +363,12 @@ def main():
         </div>
         """, unsafe_allow_html=True)
     with col2:
-        channel, channels = get_channel()
+        channel, channels, error = get_channel()
         if channel:
-            st.success(f"Connected: {channel['name'][:15]}")
+            st.success(f"Connected: {channel['name'][:20]}")
             st.session_state['channel_id'] = channel['id']
+        elif error:
+            st.warning(f"{error[:30]}...")
         else:
             st.error("No channel")
 
@@ -378,13 +435,26 @@ def main():
 
         post_text = st.session_state.get('post_text', '')
 
-        headline = st.text_input("Image Headline", value=post_text.split('\n')[0][:50] if post_text else "")
+        # Headline with translate option
+        col_h1, col_h2 = st.columns([3, 1])
+        with col_h1:
+            headline = st.text_input("Image Headline (Chinese)", value=st.session_state.get('headline', post_text.split('\n')[0][:50] if post_text else ""))
+        with col_h2:
+            st.write("")  # Spacer
+            if st.button("Translate"):
+                if headline:
+                    translated = translate_to_chinese(headline)
+                    st.session_state['headline'] = translated
+                    st.rerun()
+
+        # Image size selection
+        size = st.selectbox("Image Size", list(IMAGE_SIZES.keys()), format_func=lambda x: IMAGE_SIZES[x]['name'])
         theme = st.selectbox("Theme", list(THEMES.keys()), format_func=lambda x: THEMES[x]['name'])
         hashtags = st.text_input("Hashtags", value="AI, IndigoFoundry")
 
         if st.button("Generate Preview", type="primary", use_container_width=True):
             if headline:
-                img = generate_image(headline, theme, [h.strip() for h in hashtags.split(',')])
+                img = generate_image(headline, theme, [h.strip() for h in hashtags.split(',')], size)
                 if img:
                     st.session_state['preview'] = img
 
