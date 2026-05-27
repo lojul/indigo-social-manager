@@ -350,13 +350,9 @@ def main():
 
         st.divider()
 
-        # Buffer API Token
-        buffer_token = st.text_input(
-            "Buffer API Token",
-            value=BUFFER_API_TOKEN,
-            type="password",
-            help="Get from Buffer Settings > API"
-        )
+        # Use token from secrets
+        buffer_token = BUFFER_API_TOKEN
+        selected_channel_id = None
 
         if buffer_token:
             channels = get_channels(buffer_token)
@@ -366,11 +362,9 @@ def main():
                 selected_channel_name = st.selectbox("Select Channel", options=list(channel_options.keys()))
                 selected_channel_id = channel_options.get(selected_channel_name)
             else:
-                st.warning("No channels found")
-                selected_channel_id = None
+                st.warning("No channels found. Check Buffer token in secrets.")
         else:
-            st.info("Enter Buffer token to connect")
-            selected_channel_id = None
+            st.error("Buffer token not configured. Add BUFFER_API_TOKEN to secrets.")
 
         st.divider()
 
