@@ -402,39 +402,63 @@ def create_buffer_post(channel_id, text, image_url=None, token=None):
 # ============================================================================
 
 def fetch_trending_topics():
-    """Fetch trending AI/Tech topics"""
-    # Simulated trending topics (in production, use web search API)
+    """Fetch trending AI/Tech/Odoo topics"""
     topics = [
-        {
-            'title': 'Agentic AI 成為2026年最熱門趨勢',
-            'description': 'AI代理團隊協作處理複雜任務',
-            'category': 'AI'
-        },
-        {
-            'title': 'Odoo 20 即將於9月發布',
-            'description': '新版本將全面整合AI功能',
-            'category': 'Odoo'
-        },
-        {
-            'title': 'Claude Code 整合進 Odoo.sh',
-            'description': 'Vibe coding讓開發者用自然語言寫程式',
-            'category': 'Odoo'
-        },
-        {
-            'title': 'Google TurboQuant 突破性演算法',
-            'description': '大幅降低AI模型記憶體需求',
-            'category': 'AI'
-        },
-        {
-            'title': '全球17.8%工作人口使用AI協作',
-            'description': 'AI使用率持續快速增長',
-            'category': 'AI'
-        },
-        {
-            'title': 'ERP系統助企業降低25-35%營運成本',
-            'description': 'Odoo等開源方案越來越受歡迎',
-            'category': 'Odoo'
-        },
+        # AI Trends
+        {'title': 'Agentic AI 成為2026年最熱門趨勢', 'category': 'AI'},
+        {'title': 'AI代理團隊協作處理複雜任務', 'category': 'AI'},
+        {'title': '全球17.8%工作人口使用AI協作', 'category': 'AI'},
+        {'title': 'Google TurboQuant 突破性演算法', 'category': 'AI'},
+        {'title': 'AI從工具進化為工作夥伴', 'category': 'AI'},
+        {'title': 'Claude 4 Opus 多模態能力大躍進', 'category': 'AI'},
+        {'title': 'GPT-5 即將發布的傳聞', 'category': 'AI'},
+        {'title': 'AI程式碼助手提升開發效率50%', 'category': 'AI'},
+        {'title': '企業AI採用率創新高', 'category': 'AI'},
+        {'title': 'AI自動化客服解決方案', 'category': 'AI'},
+        {'title': 'RAG技術讓AI更準確', 'category': 'AI'},
+        {'title': 'AI影像生成技術突破', 'category': 'AI'},
+        {'title': '小型語言模型(SLM)崛起', 'category': 'AI'},
+        {'title': 'AI安全與倫理議題', 'category': 'AI'},
+        {'title': 'Vibe Coding 用自然語言寫程式', 'category': 'AI'},
+
+        # Odoo
+        {'title': 'Odoo 20 即將於9月發布', 'category': 'Odoo'},
+        {'title': 'Odoo全面整合AI功能', 'category': 'Odoo'},
+        {'title': 'Claude Code 整合進 Odoo.sh', 'category': 'Odoo'},
+        {'title': 'Odoo Experience 2026 全球活動', 'category': 'Odoo'},
+        {'title': 'Odoo營收突破6億歐元', 'category': 'Odoo'},
+        {'title': 'Odoo vs SAP：中小企業的選擇', 'category': 'Odoo'},
+        {'title': 'Odoo電商模組新功能', 'category': 'Odoo'},
+        {'title': 'Odoo庫存管理最佳實踐', 'category': 'Odoo'},
+        {'title': 'Odoo會計模組自動化', 'category': 'Odoo'},
+        {'title': 'Odoo CRM提升銷售效率', 'category': 'Odoo'},
+        {'title': 'Odoo製造模組MRP應用', 'category': 'Odoo'},
+        {'title': 'Odoo人資模組簡化HR流程', 'category': 'Odoo'},
+        {'title': 'Odoo多公司管理功能', 'category': 'Odoo'},
+        {'title': 'Odoo開源ERP成本優勢', 'category': 'Odoo'},
+        {'title': 'Odoo Studio低代碼開發', 'category': 'Odoo'},
+
+        # Digital Transformation
+        {'title': 'ERP系統助企業降低25-35%營運成本', 'category': '數位轉型'},
+        {'title': '中小企業數位轉型指南', 'category': '數位轉型'},
+        {'title': '雲端ERP vs 本地部署', 'category': '數位轉型'},
+        {'title': '自動化流程提升營運效率', 'category': '數位轉型'},
+        {'title': '數據驅動決策的重要性', 'category': '數位轉型'},
+        {'title': '電子發票與數位化轉型', 'category': '數位轉型'},
+        {'title': '遠端工作與協作工具', 'category': '數位轉型'},
+        {'title': 'API整合打通企業系統', 'category': '數位轉型'},
+        {'title': '低代碼平台加速開發', 'category': '數位轉型'},
+        {'title': '企業資安防護策略', 'category': '數位轉型'},
+
+        # Hong Kong / Taiwan Business
+        {'title': '香港中小企數位化補助計劃', 'category': '商業'},
+        {'title': '台灣產業AI應用案例', 'category': '商業'},
+        {'title': '大灣區科技發展機遇', 'category': '商業'},
+        {'title': '跨境電商經營策略', 'category': '商業'},
+        {'title': '香港Fintech發展趨勢', 'category': '商業'},
+        {'title': '台灣製造業智慧轉型', 'category': '商業'},
+        {'title': '零售業O2O整合方案', 'category': '商業'},
+        {'title': '餐飲業POS系統選擇', 'category': '商業'},
     ]
     return topics
 
@@ -499,15 +523,40 @@ def render_create_post(buffer_token, channel_id):
 
         # AI Generation section
         with st.expander("🤖 AI 生成貼文", expanded=True):
-            ai_topic = st.text_input(
-                "輸入主題",
-                placeholder="例如：Agentic AI 趨勢、Odoo 20 新功能、ERP數位轉型...",
-                key="ai_topic"
+            # Get trending topics
+            topics = fetch_trending_topics()
+            categories = ['全部'] + list(set(t['category'] for t in topics))
+
+            # Category filter
+            selected_cat = st.selectbox("分類", categories, key="ai_cat")
+
+            # Filter topics by category
+            if selected_cat == '全部':
+                filtered_topics = topics
+            else:
+                filtered_topics = [t for t in topics if t['category'] == selected_cat]
+
+            # Topic dropdown
+            topic_titles = [t['title'] for t in filtered_topics]
+            selected_topic = st.selectbox(
+                "選擇熱門主題",
+                options=topic_titles,
+                key="ai_topic_select"
             )
+
+            # Optional: custom topic
+            custom_topic = st.text_input(
+                "或輸入自訂主題",
+                placeholder="留空則使用上方選擇的主題",
+                key="custom_topic"
+            )
+
+            # Use custom topic if provided, otherwise use selected
+            ai_topic = custom_topic.strip() if custom_topic.strip() else selected_topic
 
             if st.button("✨ AI 生成", type="secondary", use_container_width=True):
                 if not ai_topic:
-                    st.warning("請輸入主題")
+                    st.warning("請選擇或輸入主題")
                 elif not OPENROUTER_API_KEY:
                     st.error("請在 secrets 中設定 OPENROUTER_API_KEY")
                 else:
@@ -515,7 +564,7 @@ def render_create_post(buffer_token, channel_id):
                         content, error = generate_ai_content(ai_topic)
                         if content:
                             st.session_state['generated_text'] = content
-                            st.success("生成成功！")
+                            st.success("✅ 生成成功！")
                         else:
                             st.error(error)
 
