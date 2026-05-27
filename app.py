@@ -40,9 +40,13 @@ except ImportError:
 def get_secret(key, default=""):
     """Get secret from Streamlit Cloud or environment variable"""
     try:
-        return st.secrets.get(key, os.getenv(key, default))
-    except:
-        return os.getenv(key, default)
+        # Try st.secrets first (Streamlit Cloud)
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass
+    # Fall back to environment variable
+    return os.getenv(key, default)
 
 BUFFER_API_URL = "https://api.buffer.com/rpc"
 IMGBB_API_KEY = get_secret("IMGBB_API_KEY", "")
@@ -355,14 +359,17 @@ def main():
         selected_channel_id = None
 
         if buffer_token:
-            channels = get_channels(buffer_token)
-            if channels:
-                st.success(f"✓ Connected ({len(channels)} channels)")
-                channel_options = {c['name']: c['id'] for c in channels}
-                selected_channel_name = st.selectbox("Select Channel", options=list(channel_options.keys()))
-                selected_channel_id = channel_options.get(selected_channel_name)
-            else:
-                st.warning("No channels found. Check Buffer token in secrets.")
+            try:
+                channels = get_channels(buffer_token)
+                if channels:
+                    st.success(f"✓ Connected ({len(channels)} channels)")
+                    channel_options = {c['name']: c['id'] for c in channels}
+                    selected_channel_name = st.selectbox("Select Channel", options=list(channel_options.keys()))
+                    selected_channel_id = channel_options.get(selected_channel_name)
+                else:
+                    st.warning("No channels found. The token may be invalid or have no channels connected.")
+            except Exception as e:
+                st.error(f"Buffer API error: {str(e)}")
         else:
             st.error("Buffer token not configured. Add BUFFER_API_TOKEN to secrets.")
 
