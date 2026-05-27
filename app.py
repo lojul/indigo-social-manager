@@ -363,12 +363,24 @@ def main():
         </div>
         """, unsafe_allow_html=True)
     with col2:
-        channel, channels, error = get_channel()
+        # Only fetch channel once, cache it
+        if 'channel_cached' not in st.session_state:
+            channel, channels, error = get_channel()
+            st.session_state['channel_cached'] = True
+            st.session_state['channel_info'] = channel
+            st.session_state['channel_error'] = error
+        else:
+            channel = st.session_state.get('channel_info')
+            error = st.session_state.get('channel_error')
+
         if channel:
             st.success(f"Connected: {channel['name'][:20]}")
             st.session_state['channel_id'] = channel['id']
         elif error:
             st.warning(f"{error[:30]}...")
+            if st.button("Retry", key="retry_buffer"):
+                st.session_state.pop('channel_cached', None)
+                st.rerun()
         else:
             st.error("No channel")
 
