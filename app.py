@@ -211,10 +211,35 @@ def buffer_request(query, variables=None, token=None):
     return response.json()
 
 
-def get_channels(token=None):
+def get_organization_id(token=None):
+    """Get the first organization ID from Buffer account"""
     query = """
-    query GetChannels {
-        channels {
+    query GetAccount {
+        account {
+            id
+            organizations {
+                id
+                name
+            }
+        }
+    }
+    """
+    result = buffer_request(query, token=token)
+    if result and 'data' in result:
+        orgs = result['data'].get('account', {}).get('organizations', [])
+        if orgs:
+            return orgs[0]['id']
+    return None
+
+
+def get_channels(token=None):
+    org_id = get_organization_id(token)
+    if not org_id:
+        return []
+
+    query = """
+    query GetChannels($input: ChannelsInput!) {
+        channels(input: $input) {
             id
             name
             service
@@ -222,8 +247,13 @@ def get_channels(token=None):
         }
     }
     """
-    result = buffer_request(query, token=token)
-    if result:
+    variables = {
+        'input': {
+            'organizationId': org_id
+        }
+    }
+    result = buffer_request(query, variables, token=token)
+    if result and 'data' in result:
         return result.get('data', {}).get('channels', [])
     return []
 
