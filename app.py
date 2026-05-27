@@ -52,6 +52,7 @@ BUFFER_API_URL = "https://api.buffer.com/rpc"
 IMGBB_API_KEY = get_secret("IMGBB_API_KEY", "")
 BUFFER_API_TOKEN = get_secret("BUFFER_API_TOKEN", "")
 OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY", "")
+TAVILY_API_KEY = get_secret("TAVILY_API_KEY", "")
 
 # Brand colors
 THEMES = {
@@ -216,6 +217,108 @@ AI_SYSTEM_PROMPT = """你是青藍科技 (Indigo Foundry) 的社交媒體內容�
 - 政治敏感話題
 - 過於銷售導向的語氣
 - 虛假或未經證實的資訊"""
+
+
+def fetch_live_trends(category="AI"):
+    """Fetch live trending topics using Tavily search API"""
+    if not TAVILY_API_KEY:
+        return None, "請在 secrets 中設定 TAVILY_API_KEY"
+
+    search_queries = {
+        "AI": "AI artificial intelligence trends news 2026",
+        "Odoo": "Odoo ERP news updates 2026",
+        "Tech": "technology trends Hong Kong Taiwan 2026",
+    }
+
+    query = search_queries.get(category, search_queries["AI"])
+
+    try:
+        response = requests.post(
+            "https://api.tavily.com/search",
+            json={
+                "api_key": TAVILY_API_KEY,
+                "query": query,
+                "search_depth": "basic",
+                "max_results": 10,
+                "include_answer": True,
+            },
+            timeout=30
+        )
+
+        data = response.json()
+
+        if 'error' in data:
+            return None, f"Search error: {data['error']}"
+
+        results = data.get('results', [])
+        topics = []
+        for r in results:
+            topics.append({
+                'title': r.get('title', ''),
+                'summary': r.get('content', '')[:200] + '...' if len(r.get('content', '')) > 200 else r.get('content', ''),
+                'url': r.get('url', ''),
+            })
+
+        return topics, None
+
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
+
+def summarize_trends_with_ai(topics):
+    """Use AI to create post-worthy summaries from search results"""
+    if not OPENROUTER_API_KEY or not topics:
+        return topics
+
+    # Create a prompt to extract key trending topics
+    topics_text = "\n".join([f"- {t['title']}: {t['summary']}" for t in topics[:10]])
+
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "anthropic/claude-3-haiku",
+                "messages": [
+                    {"role": "system", "content": """你是一個科技趨勢分析師。根據提供的搜尋結果，提取5-8個最適合社交媒體發布的熱門話題。
+
+請用JSON格式回覆，格式如下：
+[
+  {"title": "話題標題（簡短有力）", "summary": "一句話摘要（50字內）", "angle": "建議的貼文角度"}
+]
+
+只回覆JSON，不要其他文字。"""},
+                    {"role": "user", "content": f"搜尋結果：\n{topics_text}"}
+                ],
+                "temperature": 0.7,
+                "max_tokens": 800,
+            },
+            timeout=30
+        )
+
+        data = response.json()
+        content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+
+        # Parse JSON from response
+        import json
+        # Try to extract JSON from the response
+        try:
+            parsed = json.loads(content)
+            return parsed
+        except:
+            # Try to find JSON in the response
+            import re
+            json_match = re.search(r'\[[\s\S]*\]', content)
+            if json_match:
+                return json.loads(json_match.group())
+
+    except Exception as e:
+        pass
+
+    return topics
 
 
 def generate_ai_content(topic, api_key=None):
@@ -500,83 +603,124 @@ def main():
         # Navigation
         page = st.radio(
             "Navigation",
-            ["📝 Create Post", "🔥 Trending Topics", "📋 Post Queue"],
+            ["🔍 獲取熱門話題", "📝 Create Post", "📋 Post Queue"],
             label_visibility="collapsed"
         )
 
     # Main content
-    if page == "📝 Create Post":
+    if page == "🔍 獲取熱門話題":
+        render_fetch_trends()
+    elif page == "📝 Create Post":
         render_create_post(buffer_token, selected_channel_id)
-    elif page == "🔥 Trending Topics":
-        render_trending_topics(buffer_token, selected_channel_id)
     elif page == "📋 Post Queue":
         render_post_queue(buffer_token, selected_channel_id)
 
 
+def render_fetch_trends():
+    st.header("🔍 獲取熱門話題")
+    st.caption("點擊按鈕讓 AI 搜尋最新熱門話題，選擇後自動生成貼文")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("🤖 AI 趨勢", type="primary", use_container_width=True):
+            fetch_and_display_trends("AI")
+
+    with col2:
+        if st.button("📊 Odoo 新聞", type="primary", use_container_width=True):
+            fetch_and_display_trends("Odoo")
+
+    with col3:
+        if st.button("💡 科技趨勢", type="primary", use_container_width=True):
+            fetch_and_display_trends("Tech")
+
+    st.divider()
+
+    # Display fetched trends
+    if 'fetched_trends' in st.session_state and st.session_state['fetched_trends']:
+        st.subheader("📋 選擇話題")
+
+        for i, topic in enumerate(st.session_state['fetched_trends']):
+            with st.container():
+                col_a, col_b = st.columns([4, 1])
+
+                with col_a:
+                    st.markdown(f"**{topic.get('title', '')}**")
+                    summary = topic.get('summary', topic.get('angle', ''))
+                    if summary:
+                        st.caption(summary)
+
+                with col_b:
+                    if st.button("使用", key=f"use_trend_{i}", use_container_width=True):
+                        # Generate post content for this topic
+                        with st.spinner("AI 正在生成貼文..."):
+                            topic_text = f"{topic.get('title', '')} - {topic.get('summary', topic.get('angle', ''))}"
+                            content, error = generate_ai_content(topic_text)
+                            if content:
+                                st.session_state['generated_text'] = content
+                                st.session_state['selected_topic'] = topic.get('title', '')
+                                st.success("✅ 已生成貼文！請到「Create Post」查看")
+                            else:
+                                st.error(error or "生成失敗")
+
+                st.divider()
+    else:
+        st.info("👆 點擊上方按鈕獲取最新熱門話題")
+
+
+def fetch_and_display_trends(category):
+    """Fetch trends and store in session state"""
+    with st.spinner(f"正在搜尋 {category} 相關熱門話題..."):
+        topics, error = fetch_live_trends(category)
+
+        if error:
+            st.error(error)
+            return
+
+        if topics:
+            # Summarize with AI
+            with st.spinner("AI 正在分析話題..."):
+                summarized = summarize_trends_with_ai(topics)
+                st.session_state['fetched_trends'] = summarized
+                st.rerun()
+        else:
+            st.warning("未找到相關話題")
+
+
 def render_create_post(buffer_token, channel_id):
     st.header("📝 Create Post")
+
+    # Show selected topic if any
+    if 'selected_topic' in st.session_state:
+        st.info(f"📌 選定話題: {st.session_state['selected_topic']}")
 
     col1, col2 = st.columns([1, 1])
 
     with col1:
         st.subheader("Post Content")
 
-        # AI Generation section
-        with st.expander("🤖 AI 生成貼文", expanded=True):
-            # Get trending topics
-            topics = fetch_trending_topics()
-            categories = ['全部'] + list(set(t['category'] for t in topics))
-
-            # Category filter
-            selected_cat = st.selectbox("分類", categories, key="ai_cat")
-
-            # Filter topics by category
-            if selected_cat == '全部':
-                filtered_topics = topics
-            else:
-                filtered_topics = [t for t in topics if t['category'] == selected_cat]
-
-            # Topic dropdown
-            topic_titles = [t['title'] for t in filtered_topics]
-            selected_topic = st.selectbox(
-                "選擇熱門主題",
-                options=topic_titles,
-                key="ai_topic_select"
-            )
-
-            # Optional: custom topic
-            custom_topic = st.text_input(
-                "或輸入自訂主題",
-                placeholder="留空則使用上方選擇的主題",
-                key="custom_topic"
-            )
-
-            # Use custom topic if provided, otherwise use selected
-            ai_topic = custom_topic.strip() if custom_topic.strip() else selected_topic
-
-            if st.button("✨ AI 生成", type="secondary", use_container_width=True):
-                if not ai_topic:
-                    st.warning("請選擇或輸入主題")
-                elif not OPENROUTER_API_KEY:
-                    st.error("請在 secrets 中設定 OPENROUTER_API_KEY")
-                else:
-                    with st.spinner("AI 正在生成內容..."):
-                        content, error = generate_ai_content(ai_topic)
-                        if content:
-                            st.session_state['generated_text'] = content
-                            st.success("✅ 生成成功！")
-                        else:
-                            st.error(error)
-
         # Post text - use generated text if available
         default_text = st.session_state.get('generated_text', '')
         post_text = st.text_area(
             "Post Text",
             value=default_text,
-            height=150,
-            placeholder="輸入貼文內容...\n\n例如：2026年，AI不再只是工具，而是你的工作夥伴！",
+            height=180,
+            placeholder="輸入貼文內容，或先到「獲取熱門話題」讓 AI 生成...",
             help="The caption for your Facebook post"
         )
+
+        # Manual AI generate option
+        with st.expander("🤖 手動輸入主題生成"):
+            manual_topic = st.text_input("輸入主題", placeholder="例如：Agentic AI 最新趨勢")
+            if st.button("✨ 生成", use_container_width=True):
+                if manual_topic:
+                    with st.spinner("生成中..."):
+                        content, error = generate_ai_content(manual_topic)
+                        if content:
+                            st.session_state['generated_text'] = content
+                            st.rerun()
+                        else:
+                            st.error(error)
 
         # Image headline (can be different from post text)
         use_custom_headline = st.checkbox("Use different text for image")
