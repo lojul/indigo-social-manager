@@ -353,36 +353,13 @@ def render_stepper(step):
     st.markdown(html, unsafe_allow_html=True)
 
 def main():
-    # Header
-    col1, col2 = st.columns([5, 2])
-    with col1:
-        st.markdown("""
-        <div class="app-header">
-            <img src="https://indigofoundry.app/favicon-512.png" width="32">
-            <span class="app-title">Indigo Foundry Social Manager</span>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        # Only fetch channel once, cache it
-        if 'channel_cached' not in st.session_state:
-            channel, channels, error = get_channel()
-            st.session_state['channel_cached'] = True
-            st.session_state['channel_info'] = channel
-            st.session_state['channel_error'] = error
-        else:
-            channel = st.session_state.get('channel_info')
-            error = st.session_state.get('channel_error')
-
-        if channel:
-            st.success(f"Connected: {channel['name'][:20]}")
-            st.session_state['channel_id'] = channel['id']
-        elif error:
-            st.warning(f"{error[:30]}...")
-            if st.button("Retry", key="retry_buffer"):
-                st.session_state.pop('channel_cached', None)
-                st.rerun()
-        else:
-            st.error("No channel")
+    # Header - NO Buffer API calls here
+    st.markdown("""
+    <div class="app-header">
+        <img src="https://indigofoundry.app/favicon-512.png" width="32">
+        <span class="app-title">Indigo Foundry Social Manager</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Calculate current step
     step = 0
@@ -474,22 +451,30 @@ def main():
             st.image(st.session_state['preview'], use_container_width=True)
 
             if st.button("Post to Buffer", type="primary", use_container_width=True):
-                cid = st.session_state.get('channel_id')
                 txt = st.session_state.get('post_text')
-                if cid and txt:
-                    with st.spinner("Publishing..."):
-                        try:
-                            url = upload_to_imgbb(image_to_base64(st.session_state['preview']))
-                            r = create_post(cid, txt, url)
-                            if r and r.get('data', {}).get('createPost', {}).get('__typename') == 'PostActionSuccess':
-                                st.success("Posted!")
-                                st.balloons()
-                            else:
-                                st.error("Failed")
-                        except Exception as e:
-                            st.error(str(e))
+                if not txt:
+                    st.error("Please enter post text")
                 else:
-                    st.error("Missing channel or text")
+                    with st.spinner("Connecting to Buffer..."):
+                        # Only call Buffer API when posting
+                        channel, channels, error = get_channel()
+                        if error:
+                            st.error(f"Buffer error: {error}")
+                        elif not channel:
+                            st.error("No Buffer channel found")
+                        else:
+                            with st.spinner("Publishing..."):
+                                try:
+                                    url = upload_to_imgbb(image_to_base64(st.session_state['preview']))
+                                    r = create_post(channel['id'], txt, url)
+                                    if r and r.get('data', {}).get('createPost', {}).get('__typename') == 'PostActionSuccess':
+                                        st.success("Posted!")
+                                        st.balloons()
+                                    else:
+                                        err_msg = r.get('data', {}).get('createPost', {}).get('message', 'Unknown error') if r else 'No response'
+                                        st.error(f"Failed: {err_msg}")
+                                except Exception as e:
+                                    st.error(str(e))
 
             if st.button("Clear All"):
                 for k in ['preview', 'post_text', 'selected_topic', 'search_results']:
