@@ -1,6 +1,5 @@
 """
 Indigo Foundry Social Media Manager
-Streamlit app for managing Facebook posts with AI-generated images
 """
 
 import streamlit as st
@@ -9,26 +8,138 @@ import base64
 import io
 import os
 import json
-import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# Must be first Streamlit command
+# Page config
 st.set_page_config(
-    page_title="Indigo Foundry - Social Manager",
+    page_title="Social Media Manager | Indigo Foundry",
     page_icon="https://indigofoundry.app/favicon-512.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Try to load PIL
+# Custom CSS for Buffer-like design
+st.markdown("""
+<style>
+    /* Main background */
+    .stApp {
+        background-color: #FAFAFA;
+    }
+
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background-color: #FFFFFF;
+        border-right: 1px solid #E5E7EB;
+    }
+
+    [data-testid="stSidebar"] .stRadio > label {
+        font-size: 14px;
+        color: #374151;
+    }
+
+    /* Cards */
+    .card {
+        background: white;
+        border: 1px solid #E5E7EB;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 16px;
+    }
+
+    .card-header {
+        font-size: 14px;
+        font-weight: 500;
+        color: #6B7280;
+        margin-bottom: 8px;
+    }
+
+    .card-value {
+        font-size: 28px;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    /* Section headers */
+    .section-header {
+        font-size: 11px;
+        font-weight: 600;
+        color: #9CA3AF;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 24px 0 12px 0;
+    }
+
+    /* Topic cards */
+    .topic-card {
+        background: white;
+        border: 1px solid #E5E7EB;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        transition: border-color 0.2s;
+    }
+
+    .topic-card:hover {
+        border-color: #4F46E5;
+    }
+
+    .topic-title {
+        font-size: 15px;
+        font-weight: 500;
+        color: #111827;
+        margin-bottom: 4px;
+    }
+
+    .topic-summary {
+        font-size: 13px;
+        color: #6B7280;
+        line-height: 1.5;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    /* Hide default streamlit elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0;
+        border-bottom: 1px solid #E5E7EB;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    /* Form inputs */
+    .stTextInput input, .stTextArea textarea, .stSelectbox select {
+        border-radius: 6px;
+        border-color: #E5E7EB;
+    }
+
+    /* Success/error messages */
+    .stSuccess, .stError, .stWarning, .stInfo {
+        border-radius: 6px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Load PIL
 try:
     from PIL import Image, ImageDraw, ImageFont
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
-    st.error("Pillow not installed. Run: pip install Pillow")
 
-# Load environment variables (local dev)
+# Load env
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -40,11 +151,10 @@ except ImportError:
 # ============================================================================
 
 def get_secret(key, default=""):
-    """Get secret from Streamlit Cloud or environment variable"""
     try:
         if key in st.secrets:
             return st.secrets[key]
-    except Exception:
+    except:
         pass
     return os.getenv(key, default)
 
@@ -54,12 +164,10 @@ BUFFER_API_TOKEN = get_secret("BUFFER_API_TOKEN", "")
 OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY", "")
 TAVILY_API_KEY = get_secret("TAVILY_API_KEY", "")
 
-# Brand colors
 THEMES = {
     'indigo': {'bg': '#4F46E5', 'text': '#FFFFFF', 'accent': '#F59E0B', 'name': 'Indigo'},
     'navy': {'bg': '#1E1B4B', 'text': '#FFFFFF', 'accent': '#818CF8', 'name': 'Navy'},
     'teal': {'bg': '#0F766E', 'text': '#FFFFFF', 'accent': '#F59E0B', 'name': 'Teal'},
-    'coral': {'bg': '#EA580C', 'text': '#FFFFFF', 'accent': '#1E1B4B', 'name': 'Coral'},
     'slate': {'bg': '#1E293B', 'text': '#FFFFFF', 'accent': '#14B8A6', 'name': 'Slate'},
     'purple': {'bg': '#7C3AED', 'text': '#FFFFFF', 'accent': '#FCD34D', 'name': 'Purple'},
 }
@@ -69,23 +177,19 @@ IMAGE_HEIGHT = 630
 MARGIN = 60
 
 # ============================================================================
-# Image Generation Functions
+# Image Generation
 # ============================================================================
 
 def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-
 def get_font(size):
     font_paths = [
         '/System/Library/Fonts/PingFang.ttc',
-        '/System/Library/Fonts/STHeiti Medium.ttc',
-        '/Library/Fonts/Arial Unicode.ttf',
         '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
         '/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc',
         '/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc',
-        'C:\\Windows\\Fonts\\msjh.ttc',
     ]
     for path in font_paths:
         if os.path.exists(path):
@@ -95,15 +199,12 @@ def get_font(size):
                 continue
     return ImageFont.load_default()
 
-
 def wrap_text(draw, text, font, max_width):
-    lines = []
-    current_line = ""
+    lines, current_line = [], ""
     for char in text:
         test_line = current_line + char
         bbox = draw.textbbox((0, 0), test_line, font=font)
-        width = bbox[2] - bbox[0]
-        if width <= max_width:
+        if bbox[2] - bbox[0] <= max_width:
             current_line = test_line
         else:
             if current_line:
@@ -113,65 +214,48 @@ def wrap_text(draw, text, font, max_width):
         lines.append(current_line)
     return lines
 
-
 def generate_image(headline, theme='indigo', hashtags=None, logo_url=None):
     if not PIL_AVAILABLE:
         return None
-
     colors = THEMES.get(theme, THEMES['indigo'])
-
     img = Image.new('RGB', (IMAGE_WIDTH, IMAGE_HEIGHT), hex_to_rgb(colors['bg']))
     draw = ImageDraw.Draw(img)
 
-    # Draw corner accents
     accent = hex_to_rgb(colors['accent'])
     draw.line([(MARGIN, MARGIN), (MARGIN + 100, MARGIN)], fill=accent, width=3)
     draw.line([(MARGIN, MARGIN), (MARGIN, MARGIN + 100)], fill=accent, width=3)
-    draw.line([(IMAGE_WIDTH - MARGIN, IMAGE_HEIGHT - MARGIN),
-               (IMAGE_WIDTH - MARGIN - 100, IMAGE_HEIGHT - MARGIN)], fill=accent, width=3)
-    draw.line([(IMAGE_WIDTH - MARGIN, IMAGE_HEIGHT - MARGIN),
-               (IMAGE_WIDTH - MARGIN, IMAGE_HEIGHT - MARGIN - 100)], fill=accent, width=3)
+    draw.line([(IMAGE_WIDTH - MARGIN, IMAGE_HEIGHT - MARGIN), (IMAGE_WIDTH - MARGIN - 100, IMAGE_HEIGHT - MARGIN)], fill=accent, width=3)
+    draw.line([(IMAGE_WIDTH - MARGIN, IMAGE_HEIGHT - MARGIN), (IMAGE_WIDTH - MARGIN, IMAGE_HEIGHT - MARGIN - 100)], fill=accent, width=3)
 
-    # Draw headline
     font_main = get_font(52)
     font_hashtag = get_font(24)
     text_color = hex_to_rgb(colors['text'])
 
     lines = wrap_text(draw, headline, font_main, IMAGE_WIDTH - MARGIN * 2)
     line_height = 70
-    total_height = len(lines) * line_height
-    start_y = (IMAGE_HEIGHT * 0.45) - (total_height / 2)
+    start_y = (IMAGE_HEIGHT * 0.45) - (len(lines) * line_height / 2)
 
     for i, line in enumerate(lines):
         bbox = draw.textbbox((0, 0), line, font=font_main)
-        text_width = bbox[2] - bbox[0]
-        x = (IMAGE_WIDTH - text_width) / 2
-        y = start_y + (i * line_height)
-        draw.text((x, y), line, font=font_main, fill=text_color)
+        x = (IMAGE_WIDTH - (bbox[2] - bbox[0])) / 2
+        draw.text((x, start_y + i * line_height), line, font=font_main, fill=text_color)
 
-    # Draw hashtags
     if hashtags:
         hashtag_text = '  '.join(f'#{tag}' for tag in hashtags if tag.strip())
         if hashtag_text:
             draw.text((MARGIN, IMAGE_HEIGHT - 50), hashtag_text, font=font_hashtag, fill=text_color)
 
-    # Draw logo
     if logo_url:
         try:
             response = requests.get(logo_url, timeout=10)
             logo = Image.open(io.BytesIO(response.content)).convert('RGBA')
-            logo_size = 50
-            logo.thumbnail((logo_size, logo_size), Image.LANCZOS)
-            logo_x = IMAGE_WIDTH - MARGIN - logo_size
-            logo_y = IMAGE_HEIGHT - 50 - logo_size
+            logo.thumbnail((50, 50), Image.LANCZOS)
             img_rgba = img.convert('RGBA')
-            img_rgba.paste(logo, (logo_x, logo_y), logo)
+            img_rgba.paste(logo, (IMAGE_WIDTH - MARGIN - 50, IMAGE_HEIGHT - 100), logo)
             img = img_rgba.convert('RGB')
         except:
             pass
-
     return img
-
 
 def image_to_base64(img):
     buffer = io.BytesIO()
@@ -179,236 +263,105 @@ def image_to_base64(img):
     buffer.seek(0)
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
-
 def upload_to_imgbb(image_base64, api_key):
-    response = requests.post(
-        'https://api.imgbb.com/1/upload',
-        data={'key': api_key, 'image': image_base64},
-        timeout=30
-    )
+    response = requests.post('https://api.imgbb.com/1/upload', data={'key': api_key, 'image': image_base64}, timeout=30)
     data = response.json()
     if not data.get('success'):
         raise Exception(f"Upload failed: {data.get('error', {}).get('message', 'Unknown')}")
     return data['data']['url']
 
-
 # ============================================================================
-# AI Content Generation
+# AI & Search
 # ============================================================================
-
-AI_SYSTEM_PROMPT = """你是青藍科技的社交媒體內容創作者。根據提供的主題創建Facebook貼文。
-
-要求：
-- 150-280字，繁體中文
-- 專業但親切的語氣
-- 結尾加入互動問題
-- 聚焦於AI趨勢、Odoo ERP、數位轉型
-
-請直接輸出貼文內容，不要加入任何前綴或說明。"""
-
 
 def fetch_live_trends(category="AI"):
-    """Fetch live trending topics using Tavily search API"""
     if not TAVILY_API_KEY:
-        return None, "Please configure TAVILY_API_KEY in secrets"
+        return None, "TAVILY_API_KEY not configured"
 
-    search_queries = {
+    queries = {
         "AI": "AI artificial intelligence trends news 2026",
         "Odoo": "Odoo ERP news updates 2026",
         "Tech": "technology digital transformation trends 2026",
     }
 
-    query = search_queries.get(category, search_queries["AI"])
-
     try:
-        response = requests.post(
-            "https://api.tavily.com/search",
-            json={
-                "api_key": TAVILY_API_KEY,
-                "query": query,
-                "search_depth": "basic",
-                "max_results": 8,
-                "include_answer": False,
-            },
-            timeout=30
-        )
-
+        response = requests.post("https://api.tavily.com/search", json={
+            "api_key": TAVILY_API_KEY,
+            "query": queries.get(category, queries["AI"]),
+            "search_depth": "basic",
+            "max_results": 8,
+        }, timeout=30)
         data = response.json()
-
         if 'error' in data:
             return None, f"Search error: {data['error']}"
 
         results = data.get('results', [])
-        topics = []
-        for r in results:
-            content = r.get('content', '')
-            topics.append({
-                'title': r.get('title', ''),
-                'summary': content[:180] + '...' if len(content) > 180 else content,
-                'url': r.get('url', ''),
-            })
-
-        return topics, None
-
+        return [{'title': r.get('title', ''), 'summary': r.get('content', '')[:180], 'url': r.get('url', '')} for r in results], None
     except Exception as e:
-        return None, f"Error: {str(e)}"
+        return None, str(e)
 
-
-def generate_ai_content(topic, api_key=None):
-    """Generate post content using OpenRouter API"""
-    api_key = api_key or OPENROUTER_API_KEY
-    if not api_key:
-        return None, "OpenRouter API key not configured"
+def generate_ai_content(topic):
+    if not OPENROUTER_API_KEY:
+        return None, "OPENROUTER_API_KEY not configured"
 
     try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "google/gemini-2.0-flash-001",
-                "messages": [
-                    {"role": "system", "content": AI_SYSTEM_PROMPT},
-                    {"role": "user", "content": f"主題：{topic}"}
-                ],
-                "temperature": 0.8,
-                "max_tokens": 500,
-            },
-            timeout=30
-        )
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+        }, json={
+            "model": "google/gemini-2.0-flash-001",
+            "messages": [
+                {"role": "system", "content": "你是青藍科技的社交媒體內容創作者。根據提供的主題創建Facebook貼文。要求：150-280字繁體中文，專業但親切，結尾加入互動問題。直接輸出貼文內容。"},
+                {"role": "user", "content": f"主題：{topic}"}
+            ],
+            "temperature": 0.8,
+            "max_tokens": 500,
+        }, timeout=30)
 
         data = response.json()
-
         if 'error' in data:
-            return None, f"API Error: {data['error'].get('message', 'Unknown error')}"
+            return None, data['error'].get('message', 'API Error')
 
         content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
-        if content:
-            return content.strip(), None
-        return None, "Empty response from AI"
-
+        return content.strip() if content else None, None
     except Exception as e:
-        return None, f"Error: {str(e)}"
-
+        return None, str(e)
 
 # ============================================================================
-# Buffer API Functions
+# Buffer API
 # ============================================================================
 
-def buffer_request(query, variables=None, token=None):
-    token = token or BUFFER_API_TOKEN
-    if not token:
+def buffer_request(query, variables=None):
+    if not BUFFER_API_TOKEN:
         return None
-
-    headers = {
-        'Authorization': f'Bearer {token}',
+    response = requests.post(BUFFER_API_URL, headers={
+        'Authorization': f'Bearer {BUFFER_API_TOKEN}',
         'Content-Type': 'application/json',
-    }
-
-    payload = {'query': query}
-    if variables:
-        payload['variables'] = variables
-
-    response = requests.post(BUFFER_API_URL, headers=headers, json=payload, timeout=30)
+    }, json={'query': query, 'variables': variables or {}}, timeout=30)
     return response.json()
 
-
-def get_organization_id(token=None):
-    query = """
-    query GetAccount {
-        account {
-            id
-            organizations {
-                id
-                name
-            }
-        }
-    }
-    """
-    result = buffer_request(query, token=token)
-    if result and 'data' in result:
-        orgs = result['data'].get('account', {}).get('organizations', [])
-        if orgs:
-            return orgs[0]['id']
-    return None
-
-
-def get_channels(token=None):
-    org_id = get_organization_id(token)
-    if not org_id:
+def get_channels():
+    result = buffer_request("query { account { organizations { id } } }")
+    if not result or 'data' not in result:
+        return []
+    orgs = result['data'].get('account', {}).get('organizations', [])
+    if not orgs:
         return []
 
-    query = """
-    query GetChannels($input: ChannelsInput!) {
-        channels(input: $input) {
-            id
-            name
-            service
-            avatar
-        }
-    }
-    """
-    variables = {'input': {'organizationId': org_id}}
-    result = buffer_request(query, variables, token=token)
+    org_id = orgs[0]['id']
+    result = buffer_request("query($input: ChannelsInput!) { channels(input: $input) { id name service } }", {'input': {'organizationId': org_id}})
+    return result.get('data', {}).get('channels', []) if result else []
+
+def get_posts(channel_id):
+    result = buffer_request(
+        "query($input: PostsInput!) { posts(input: $input) { edges { node { id text status dueAt assets { images { url } } } } } }",
+        {'input': {'channelId': channel_id, 'status': ['scheduled', 'draft'], 'first': 20}}
+    )
     if result and 'data' in result:
-        return result.get('data', {}).get('channels', [])
+        return [e['node'] for e in result['data'].get('posts', {}).get('edges', [])]
     return []
 
-
-def get_posts(channel_id, token=None):
-    query = """
-    query GetPosts($input: PostsInput!) {
-        posts(input: $input) {
-            edges {
-                node {
-                    id
-                    text
-                    status
-                    dueAt
-                    assets {
-                        images {
-                            url
-                        }
-                    }
-                }
-            }
-        }
-    }
-    """
-    variables = {
-        'input': {
-            'channelId': channel_id,
-            'status': ['scheduled', 'draft'],
-            'first': 20
-        }
-    }
-    result = buffer_request(query, variables, token=token)
-    if result and 'data' in result:
-        edges = result['data'].get('posts', {}).get('edges', [])
-        return [edge['node'] for edge in edges]
-    return []
-
-
-def create_buffer_post(channel_id, text, image_url=None, token=None):
-    mutation = """
-    mutation CreatePost($input: CreatePostInput!) {
-        createPost(input: $input) {
-            __typename
-            ... on PostActionSuccess {
-                post {
-                    id
-                    status
-                }
-            }
-            ... on UnexpectedError {
-                message
-            }
-        }
-    }
-    """
-
+def create_post(channel_id, text, image_url=None):
     post_input = {
         'channelId': channel_id,
         'schedulingType': 'automatic',
@@ -416,299 +369,235 @@ def create_buffer_post(channel_id, text, image_url=None, token=None):
         'text': text,
         'metadata': {'facebook': {'type': 'post'}}
     }
-
     if image_url:
         post_input['assets'] = {'images': [{'url': image_url}]}
 
-    result = buffer_request(mutation, {'input': post_input}, token=token)
-    return result
-
+    return buffer_request("""
+        mutation($input: CreatePostInput!) {
+            createPost(input: $input) {
+                __typename
+                ... on PostActionSuccess { post { id status } }
+                ... on UnexpectedError { message }
+            }
+        }
+    """, {'input': post_input})
 
 # ============================================================================
-# Streamlit UI
+# UI Components
+# ============================================================================
+
+def render_metric_card(label, value, subtext=""):
+    st.markdown(f"""
+    <div class="card">
+        <div class="card-header">{label}</div>
+        <div class="card-value">{value}</div>
+        {f'<div style="font-size:12px;color:#9CA3AF;margin-top:4px;">{subtext}</div>' if subtext else ''}
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_topic_card(title, summary, index):
+    col1, col2 = st.columns([5, 1])
+    with col1:
+        st.markdown(f"""
+        <div class="topic-card">
+            <div class="topic-title">{title}</div>
+            <div class="topic-summary">{summary}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        if st.button("Select", key=f"sel_{index}", use_container_width=True):
+            st.session_state['selected_topic'] = {'title': title, 'summary': summary}
+            st.success("Topic selected")
+
+# ============================================================================
+# Main App
 # ============================================================================
 
 def main():
     # Sidebar
     with st.sidebar:
-        st.image("https://indigofoundry.app/favicon-512.png", width=80)
-        st.title("Indigo Foundry")
+        st.image("https://indigofoundry.app/favicon-512.png", width=40)
+        st.markdown("### Indigo Foundry")
         st.caption("Social Media Manager")
 
-        st.divider()
+        st.markdown('<div class="section-header">Channel</div>', unsafe_allow_html=True)
 
-        buffer_token = BUFFER_API_TOKEN
-        selected_channel_id = None
-
-        if buffer_token:
-            try:
-                channels = get_channels(buffer_token)
-                if channels:
-                    st.success(f"Connected ({len(channels)} channels)")
-                    channel_options = {c['name']: c['id'] for c in channels}
-                    selected_channel_name = st.selectbox("Select Channel", options=list(channel_options.keys()))
-                    selected_channel_id = channel_options.get(selected_channel_name)
-                else:
-                    st.warning("No channels found")
-            except Exception as e:
-                st.error(f"Buffer API error: {str(e)}")
+        channels = get_channels()
+        if channels:
+            channel_map = {c['name']: c['id'] for c in channels}
+            selected = st.selectbox("", list(channel_map.keys()), label_visibility="collapsed")
+            st.session_state['channel_id'] = channel_map.get(selected)
+            st.success(f"Connected")
         else:
-            st.error("Buffer token not configured")
+            st.warning("No channels")
+            st.session_state['channel_id'] = None
 
-        st.divider()
-
-        page = st.radio(
-            "Navigation",
-            ["Search Trends", "Create Post", "Post Queue"],
-            label_visibility="collapsed"
-        )
+        st.markdown('<div class="section-header">Navigation</div>', unsafe_allow_html=True)
+        page = st.radio("", ["Search Trends", "Create Post", "Post Queue"], label_visibility="collapsed")
 
     # Main content
+    st.markdown(f"## {page}")
+
     if page == "Search Trends":
-        render_search_trends()
+        render_search_page()
     elif page == "Create Post":
-        render_create_post(buffer_token, selected_channel_id)
+        render_create_page()
     elif page == "Post Queue":
-        render_post_queue(buffer_token, selected_channel_id)
+        render_queue_page()
 
+def render_search_page():
+    st.caption("Search for trending topics and select one to generate a post")
 
-def render_search_trends():
-    st.header("Search Trends")
-    st.caption("Search for trending topics and generate posts with AI")
-
-    # Search section
-    col1, col2, col3 = st.columns(3)
-
+    # Search buttons
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
     with col1:
-        if st.button("AI Trends", type="primary", use_container_width=True):
-            search_and_display("AI")
-
+        ai_btn = st.button("AI Trends", use_container_width=True)
     with col2:
-        if st.button("Odoo News", type="primary", use_container_width=True):
-            search_and_display("Odoo")
-
+        odoo_btn = st.button("Odoo News", use_container_width=True)
     with col3:
-        if st.button("Tech Trends", type="primary", use_container_width=True):
-            search_and_display("Tech")
+        tech_btn = st.button("Tech", use_container_width=True)
+
+    if ai_btn:
+        do_search("AI")
+    elif odoo_btn:
+        do_search("Odoo")
+    elif tech_btn:
+        do_search("Tech")
 
     st.divider()
 
     # Results
     if 'search_results' in st.session_state and st.session_state['search_results']:
-        st.subheader("Search Results")
-
+        st.markdown("### Results")
         for i, topic in enumerate(st.session_state['search_results']):
-            with st.container():
-                col_a, col_b = st.columns([4, 1])
-
-                with col_a:
-                    st.markdown(f"**{topic.get('title', '')}**")
-                    st.caption(topic.get('summary', ''))
-
-                with col_b:
-                    if st.button("Select", key=f"select_{i}", use_container_width=True):
-                        st.session_state['selected_topic_title'] = topic.get('title', '')
-                        st.session_state['selected_topic_summary'] = topic.get('summary', '')
-                        st.info("Topic selected. Go to Create Post to generate content.")
-
-                st.divider()
+            render_topic_card(topic['title'], topic['summary'], i)
     else:
-        st.info("Click a button above to search for trending topics")
+        st.info("Click a button above to search")
 
-
-def search_and_display(category):
-    with st.spinner(f"Searching {category} trends..."):
-        topics, error = fetch_live_trends(category)
-
+def do_search(category):
+    with st.spinner("Searching..."):
+        results, error = fetch_live_trends(category)
         if error:
             st.error(error)
-            return
-
-        if topics:
-            st.session_state['search_results'] = topics
+        elif results:
+            st.session_state['search_results'] = results
             st.rerun()
-        else:
-            st.warning("No results found")
 
-
-def render_create_post(buffer_token, channel_id):
-    st.header("Create Post")
-
+def render_create_page():
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        st.subheader("Content")
+        st.markdown("### Content")
 
-        # Show selected topic if any
-        selected_title = st.session_state.get('selected_topic_title', '')
-        selected_summary = st.session_state.get('selected_topic_summary', '')
-
-        if selected_title:
-            st.info(f"Selected: {selected_title}")
-
-            if st.button("Generate Post with AI", type="primary", use_container_width=True):
+        # Selected topic
+        topic = st.session_state.get('selected_topic')
+        if topic:
+            st.info(f"Selected: {topic['title']}")
+            if st.button("Generate with AI", type="primary"):
                 with st.spinner("Generating..."):
-                    topic_text = f"{selected_title}\n{selected_summary}"
-                    content, error = generate_ai_content(topic_text)
+                    content, error = generate_ai_content(f"{topic['title']} - {topic['summary']}")
                     if content:
-                        st.session_state['generated_text'] = content
+                        st.session_state['post_text'] = content
                         st.rerun()
                     else:
-                        st.error(error or "Generation failed")
+                        st.error(error or "Failed")
 
         # Manual input
-        with st.expander("Manual Topic Input"):
-            manual_topic = st.text_input("Enter topic", placeholder="e.g., AI trends in enterprise")
-            if st.button("Generate", use_container_width=True):
-                if manual_topic:
+        with st.expander("Manual Input"):
+            manual = st.text_input("Topic")
+            if st.button("Generate"):
+                if manual:
                     with st.spinner("Generating..."):
-                        content, error = generate_ai_content(manual_topic)
+                        content, error = generate_ai_content(manual)
                         if content:
-                            st.session_state['generated_text'] = content
+                            st.session_state['post_text'] = content
                             st.rerun()
                         else:
                             st.error(error)
 
         # Post text
-        default_text = st.session_state.get('generated_text', '')
-        post_text = st.text_area(
-            "Post Text",
-            value=default_text,
-            height=180,
-            placeholder="Enter post content or generate with AI..."
-        )
+        post_text = st.text_area("Post Text", value=st.session_state.get('post_text', ''), height=180)
 
-        # Image settings
-        st.subheader("Image Settings")
+        st.markdown("### Image")
+        headline = st.text_input("Headline", value=post_text.split('\n')[0][:60] if post_text else "")
+        theme = st.selectbox("Theme", list(THEMES.keys()), format_func=lambda x: THEMES[x]['name'])
+        hashtags = st.text_input("Hashtags", value="AI, IndigoFoundry")
 
-        use_custom_headline = st.checkbox("Custom image headline")
-        if use_custom_headline:
-            image_headline = st.text_input("Image Headline", value=post_text[:50] if post_text else "")
-        else:
-            image_headline = post_text.split('\n')[0][:80] if post_text else ""
-
-        theme_options = {v['name']: k for k, v in THEMES.items()}
-        selected_theme_name = st.selectbox("Color Theme", options=list(theme_options.keys()))
-        selected_theme = theme_options[selected_theme_name]
-
-        colors = THEMES[selected_theme]
-        st.markdown(
-            f"""<div style="display:flex; gap:10px; margin:10px 0;">
-                <div style="width:30px;height:30px;background:{colors['bg']};border-radius:4px;border:1px solid #ddd;"></div>
-                <div style="width:30px;height:30px;background:{colors['accent']};border-radius:4px;border:1px solid #ddd;"></div>
-            </div>""",
-            unsafe_allow_html=True
-        )
-
-        hashtags_input = st.text_input("Hashtags (comma separated)", value="AI, DigitalTransformation, IndigoFoundry")
-        hashtags = [tag.strip() for tag in hashtags_input.split(',') if tag.strip()]
-
-        generate_clicked = st.button("Generate Preview", type="primary", use_container_width=True)
+        if st.button("Generate Preview", type="primary", use_container_width=True):
+            if headline:
+                img = generate_image(headline, theme, [h.strip() for h in hashtags.split(',')], "https://indigofoundry.app/favicon-512.png")
+                if img:
+                    st.session_state['preview'] = img
+                    st.session_state['final_text'] = post_text
 
     with col2:
-        st.subheader("Preview")
+        st.markdown("### Preview")
+        if 'preview' in st.session_state:
+            st.image(st.session_state['preview'], use_container_width=True)
 
-        if generate_clicked and image_headline:
-            with st.spinner("Generating image..."):
-                img = generate_image(
-                    headline=image_headline,
-                    theme=selected_theme,
-                    hashtags=hashtags,
-                    logo_url="https://indigofoundry.app/favicon-512.png"
-                )
+            if st.button("Post to Buffer", type="primary", use_container_width=True):
+                channel_id = st.session_state.get('channel_id')
+                if not channel_id:
+                    st.error("Select a channel")
+                elif not st.session_state.get('final_text'):
+                    st.error("Enter post text")
+                else:
+                    with st.spinner("Publishing..."):
+                        try:
+                            img_b64 = image_to_base64(st.session_state['preview'])
+                            img_url = upload_to_imgbb(img_b64, IMGBB_API_KEY)
+                            result = create_post(channel_id, st.session_state['final_text'], img_url)
 
-                if img:
-                    st.session_state['preview_image'] = img
-                    st.session_state['post_text'] = post_text
+                            if result and result.get('data', {}).get('createPost', {}).get('__typename') == 'PostActionSuccess':
+                                st.success("Posted to Buffer")
+                            else:
+                                st.error("Failed to post")
+                        except Exception as e:
+                            st.error(str(e))
 
-        if 'preview_image' in st.session_state:
-            st.image(st.session_state['preview_image'], use_container_width=True)
-
-            st.divider()
-
-            col_a, col_b = st.columns(2)
-
-            with col_a:
-                if st.button("Post to Buffer", type="primary", use_container_width=True):
-                    if not buffer_token or not channel_id:
-                        st.error("Please connect Buffer and select a channel")
-                    elif not st.session_state.get('post_text'):
-                        st.error("Please enter post text")
-                    else:
-                        with st.spinner("Publishing..."):
-                            try:
-                                img_base64 = image_to_base64(st.session_state['preview_image'])
-                                image_url = upload_to_imgbb(img_base64, IMGBB_API_KEY)
-
-                                result = create_buffer_post(
-                                    channel_id=channel_id,
-                                    text=st.session_state['post_text'],
-                                    image_url=image_url,
-                                    token=buffer_token
-                                )
-
-                                if result and 'data' in result:
-                                    post_result = result['data'].get('createPost', {})
-                                    if post_result.get('__typename') == 'PostActionSuccess':
-                                        st.success("Post added to Buffer queue")
-                                    else:
-                                        st.error(f"Error: {post_result.get('message', 'Unknown error')}")
-                                else:
-                                    st.error("Failed to create post")
-                            except Exception as e:
-                                st.error(f"Error: {str(e)}")
-
-            with col_b:
-                if st.button("Clear", use_container_width=True):
-                    for key in ['preview_image', 'post_text', 'generated_text', 'selected_topic_title', 'selected_topic_summary']:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    st.rerun()
+            if st.button("Clear"):
+                for k in ['preview', 'post_text', 'final_text', 'selected_topic']:
+                    st.session_state.pop(k, None)
+                st.rerun()
         else:
-            st.info("Enter content and click Generate Preview")
+            st.caption("Generate a preview to see it here")
 
-
-def render_post_queue(buffer_token, channel_id):
-    st.header("Post Queue")
-
-    if not buffer_token or not channel_id:
-        st.warning("Connect Buffer and select a channel to view queue")
+def render_queue_page():
+    channel_id = st.session_state.get('channel_id')
+    if not channel_id:
+        st.warning("Select a channel first")
         return
 
-    if st.button("Refresh", use_container_width=False):
+    if st.button("Refresh"):
         st.rerun()
 
-    with st.spinner("Loading..."):
-        posts = get_posts(channel_id, buffer_token)
-
+    posts = get_posts(channel_id)
     if not posts:
         st.info("No scheduled posts")
         return
 
+    # Metrics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        render_metric_card("Scheduled", len([p for p in posts if p.get('status') == 'scheduled']))
+    with col2:
+        render_metric_card("Drafts", len([p for p in posts if p.get('status') == 'draft']))
+    with col3:
+        render_metric_card("Total", len(posts))
+
+    st.markdown("### Posts")
     for post in posts:
         with st.container():
-            col1, col2 = st.columns([3, 1])
-
+            col1, col2 = st.columns([4, 1])
             with col1:
-                text = post.get('text', '')[:200]
-                if len(post.get('text', '')) > 200:
-                    text += '...'
-                st.markdown(f"**{text}**")
-
-                due_at = post.get('dueAt')
-                if due_at:
-                    st.caption(f"Scheduled: {due_at}")
-
-                status = post.get('status', 'unknown')
-                st.caption(f"Status: {status}")
-
+                text = post.get('text', '')[:150]
+                st.markdown(f"**{text}{'...' if len(post.get('text', '')) > 150 else ''}**")
+                st.caption(f"Status: {post.get('status', 'unknown')} | Due: {post.get('dueAt', 'N/A')}")
             with col2:
                 images = post.get('assets', {}).get('images', [])
                 if images:
-                    st.image(images[0]['url'], width=100)
-
+                    st.image(images[0]['url'], width=80)
             st.divider()
-
 
 if __name__ == "__main__":
     main()
