@@ -304,24 +304,54 @@ def generate_ai_content(topic):
     if not OPENROUTER_API_KEY:
         return None, "OPENROUTER_API_KEY not configured"
 
+    # Clean the topic text - remove URLs and special characters
+    clean_topic = topic.replace('http://', '').replace('https://', '')
+    clean_topic = ' '.join(clean_topic.split()[:50])  # Limit length
+
+    try:
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://indigofoundry.app",
+            "X-Title": "Indigo Social Manager",
+        }, json={
+            "model": "meta-llama/llama-3.1-8b-instruct:free",
+            "messages": [
+                {"role": "system", "content": "You are a social media content creator for a tech company. Write engaging Facebook posts in Traditional Chinese (繁體中文). Keep it professional, 150-250 characters, end with a question. Output only the post content."},
+                {"role": "user", "content": f"Write a Facebook post about: {clean_topic}"}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 400,
+        }, timeout=30)
+
+        data = response.json()
+        if 'error' in data:
+            error_msg = data['error'].get('message', 'API Error')
+            # Try fallback model
+            return try_fallback_model(clean_topic)
+
+        content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+        return content.strip() if content else None, None
+    except Exception as e:
+        return None, str(e)
+
+
+def try_fallback_model(topic):
+    """Fallback to a different model if primary fails"""
     try:
         response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers={
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
         }, json={
-            "model": "google/gemini-2.0-flash-001",
+            "model": "mistralai/mistral-7b-instruct:free",
             "messages": [
-                {"role": "system", "content": "你是青藍科技的社交媒體內容創作者。根據提供的主題創建Facebook貼文。要求：150-280字繁體中文，專業但親切，結尾加入互動問題。直接輸出貼文內容。"},
-                {"role": "user", "content": f"主題：{topic}"}
+                {"role": "user", "content": f"Write a short engaging Facebook post in Traditional Chinese about this topic. Keep it professional, around 150-200 characters, end with a question to engage readers:\n\nTopic: {topic}"}
             ],
-            "temperature": 0.8,
-            "max_tokens": 500,
+            "temperature": 0.7,
+            "max_tokens": 400,
         }, timeout=30)
 
         data = response.json()
-        if 'error' in data:
-            return None, data['error'].get('message', 'API Error')
-
         content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
         return content.strip() if content else None, None
     except Exception as e:
