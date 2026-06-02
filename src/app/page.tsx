@@ -15,6 +15,7 @@ const TOOLS = [
       </svg>
     ),
     status: 'live' as const,
+    external: false,
   },
   {
     href: '/studio',
@@ -27,6 +28,33 @@ const TOOLS = [
       </svg>
     ),
     status: 'live' as const,
+    external: false,
+  },
+  {
+    href: 'https://stock-signals-hkg.web.app',
+    title: 'Stock Signals',
+    description: 'Technical analysis scanner for HSI and US stocks — TD9, RSI, Bollinger Bands, and MACD signals with AI scoring.',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+      </svg>
+    ),
+    status: 'live' as const,
+    external: true,
+  },
+  {
+    href: 'https://property-intelligence.streamlit.app/',
+    title: 'Document Processor',
+    description: 'OCR pipeline and property intelligence chatbot for Hong Kong property documents.',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    status: 'live' as const,
+    external: true,
   },
 ];
 
@@ -75,14 +103,30 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {TOOLS.map((tool) => (
             tool.status === 'live' ? (
-              <Link key={tool.href} href={tool.href}
-                className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-indigo-200 transition-all group">
-                <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
-                  {tool.icon}
-                </div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">{tool.title}</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">{tool.description}</p>
-              </Link>
+              tool.external ? (
+                <a key={tool.href} href={tool.href} target="_blank" rel="noopener noreferrer"
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-indigo-200 transition-all group">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
+                    {tool.icon}
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <h3 className="text-sm font-semibold text-gray-900">{tool.title}</h3>
+                    <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-relaxed">{tool.description}</p>
+                </a>
+              ) : (
+                <Link key={tool.href} href={tool.href}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-indigo-200 transition-all group">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
+                    {tool.icon}
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">{tool.title}</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">{tool.description}</p>
+                </Link>
+              )
             ) : (
               <div key={tool.href}
                 className="bg-white rounded-xl border border-dashed border-gray-200 p-6 opacity-60 cursor-not-allowed">
