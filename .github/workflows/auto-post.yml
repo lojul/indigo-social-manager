@@ -1,0 +1,40 @@
+name: Auto Generate Facebook Posts
+
+on:
+  schedule:
+    # Run 3 times daily at peak engagement times (HKT: 9am, 1pm, 7pm)
+    - cron: '0 1 * * *'   # 9:00 AM HKT (1:00 UTC)
+    - cron: '0 5 * * *'   # 1:00 PM HKT (5:00 UTC)
+    - cron: '0 11 * * *'  # 7:00 PM HKT (11:00 UTC)
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  generate-posts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate and Post to Facebook
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.API_URL }}/api/generate-posts" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "Response: $body"
+          echo "HTTP Code: $http_code"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "Failed with HTTP $http_code"
+            exit 1
+          fi
+
+          # Check if posts were published
+          published=$(echo "$body" | jq -r '.postsPublished // 0')
+          echo "Posts published: $published"
+
+      - name: Report Status
+        if: always()
+        run: |
+          echo "Workflow completed at $(date)"
