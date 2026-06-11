@@ -1,53 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // Pollinations can take up to 30s
+export const maxDuration = 60;
 
-const MODELS = [
+const TEXT_MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',
   'qwen/qwen3-next-80b-a3b-instruct:free',
   'openai/gpt-oss-120b:free',
   'google/gemma-4-31b-it:free',
 ];
 
-async function generatePrompt(
-  title: string,
-  summary: string,
-  companyCategory: string,
-  apiKey: string
-): Promise<string> {
-  const instruction = `You are an expert AI image prompt engineer for the FLUX photorealistic image model.
-
-Write a concise image generation prompt (max 40 words) for a professional business image that visually represents this news story.
-
-Topic: ${title}
-Summary: ${summary}
-Industry: ${companyCategory || 'business'}
-
-Requirements:
-- Photorealistic, cinematic style
-- NO text, letters, words, or numbers in the image
-- Modern, corporate aesthetic
-- Describe the scene, lighting, colors, and mood
-- Suitable for a professional social media post
-
-Return only the prompt, nothing else.`;
-
+async function callOpenRouter(instruction: string, apiKey: string, maxTokens: number): Promise<string> {
   let lastError = '';
-  for (const model of MODELS) {
+  for (const model of TEXT_MODELS) {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://social-manager.app',
-        'X-Title': 'Social Media Manager',
+        'HTTP-Referer': 'https://admin.indigofoundry.app',
+        'X-Title': 'Indigo Admin',
       },
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: instruction }],
         temperature: 0.7,
-        max_tokens: 100,
+        max_tokens: maxTokens,
       }),
     });
 
@@ -55,16 +33,89 @@ Return only the prompt, nothing else.`;
     if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
 
     const data = await res.json();
-    const prompt = data.choices?.[0]?.message?.content?.trim();
-    if (prompt) return prompt;
+    const text = data.choices?.[0]?.message?.content?.trim();
+    if (text) return text;
     lastError = `${model} returned empty`;
   }
-  throw new Error(`Prompt generation failed: ${lastError}`);
+  throw new Error(`OpenRouter call failed: ${lastError}`);
+}
+
+async function generatePrompt(
+  title: string,
+  summary: string,
+  companyCategory: string,
+  apiKey: string
+): Promise<string> {
+  // Single call: scene + text overlay design in one JSON response
+  const raw = await callOpenRouter(
+    `You are an expert AI image prompt engineer and social media designer.
+
+Generate an image prompt and text overlay for a professional business social media post.
+
+Topic: ${title}
+Summary: ${summary}
+Industry: ${companyCategory || 'business'}
+
+Return ONLY this JSON (no markdown, no explanation):
+{"scene":"<max 30-word photorealistic cinematic scene, dark bottom third, corporate aesthetic>","headline":"<max 6 words>","subtext":"<3-5 words or empty string>","placement":"bottom-left","style":"bold white"}`,
+    apiKey,
+    180,
+  );
+
+  let scene = '';
+  let headline = title.split(' ').slice(0, 6).join(' ');
+  let subtext = '';
+
+  try {
+    const json = raw.replace(/```json\n?|\n?```/g, '').trim();
+    const d = JSON.parse(json);
+    scene = d.scene || '';
+    headline = d.headline || headline;
+    subtext = d.subtext || '';
+  } catch {
+    // Model returned plain text — use it as the scene directly
+    scene = raw.slice(0, 200);
+  }
+
+  if (!scene) scene = `Professional ${companyCategory || 'business'} scene representing ${title}, cinematic lighting, dark lower third`;
+
+  const overlay = [
+    `Text overlay at bottom-left: headline "${headline}"`,
+    subtext ? `subtext "${subtext}"` : '',
+    `in bold white typography.`,
+  ].filter(Boolean).join(', ');
+
+  return `${scene}, professional photography, high quality. ${overlay}`;
+}
+
+async function generateImageBase64(prompt: string, azureKey: string, azureEndpoint: string): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(azureEndpoint, {
+      method: 'POST',
+      headers: { 'api-key': azureKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+      signal: AbortSignal.timeout(50000),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Azure timed out or unreachable: ${msg}`);
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Azure OpenAI ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const b64 = data?.data?.[0]?.b64_json;
+  if (!b64) throw new Error('Azure returned no image data');
+  return b64;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, summary, companyName, companyCategory, width = 1200, height = 630 } = await req.json();
+    const { title, summary, companyCategory, width = 1080, height = 1080 } = await req.json();
 
     if (!title) return NextResponse.json({ error: 'title is required' }, { status: 400 });
 
@@ -74,20 +125,15 @@ export async function POST(req: NextRequest) {
     const imgbbKey = process.env.IMGBB_API_KEY;
     if (!imgbbKey) return NextResponse.json({ error: 'IMGBB_API_KEY not configured' }, { status: 500 });
 
-    // Step 1: Generate a FLUX-optimised prompt
-    const basePrompt = await generatePrompt(title, summary || '', companyCategory || '', apiKey);
-    const fullPrompt = `${basePrompt}, professional photography, high quality, 8k`;
+    const azureKey = process.env.AZURE_OPENAI_IMAGE_KEY;
+    const azureEndpoint = process.env.AZURE_OPENAI_IMAGE_ENDPOINT;
+    if (!azureKey || !azureEndpoint) return NextResponse.json({ error: 'Azure OpenAI image env vars not configured' }, { status: 500 });
 
-    // Step 2: Fetch image from Pollinations.ai
-    const pollinationsUrl =
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}` +
-      `?width=${width}&height=${height}&nologo=true&safe=true&model=flux`;
+    // Step 1: Generate scene + AI-designed text overlay prompt
+    const fullPrompt = await generatePrompt(title, summary || '', companyCategory || '', apiKey);
 
-    const imgRes = await fetch(pollinationsUrl);
-    if (!imgRes.ok) throw new Error(`Pollinations returned ${imgRes.status}`);
-
-    const arrayBuffer = await imgRes.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    // Step 2: Generate image via Azure OpenAI
+    const base64 = await generateImageBase64(fullPrompt, azureKey, azureEndpoint);
 
     // Step 3: Upload to imgbb for a permanent URL
     const form = new URLSearchParams();

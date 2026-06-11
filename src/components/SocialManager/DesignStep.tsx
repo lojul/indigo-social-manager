@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { THEMES, ThemeKey } from '@/lib/themes';
 
 const IMAGE_SIZES = {
@@ -120,7 +120,7 @@ export default function DesignStep({
   selectedTopicTitle, selectedTopicSummary, onPostSuccess,
 }: DesignStepProps) {
   const [mode, setMode] = useState<Mode>('ai');
-  const [sizeKey, setSizeKey] = useState<SizeKey>('facebook');
+  const [sizeKey, setSizeKey] = useState<SizeKey>('instagram');
   const [themeKey, setThemeKey] = useState<ThemeKey>(
     (companyTheme in THEMES ? companyTheme : 'indigo') as ThemeKey
   );
@@ -134,6 +134,14 @@ export default function DesignStep({
   // Text card state
   const [canvasDataUrl, setCanvasDataUrl] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Video / Reel state
+  const [videoUrl, setVideoUrl] = useState('');
+  const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [videoError, setVideoError] = useState('');
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
 
   // Post state
   const [posting, setPosting] = useState(false);
@@ -163,7 +171,8 @@ export default function DesignStep({
       setAiImageUrl(data.imageUrl);
       setAiPrompt(data.prompt);
     } catch (err) {
-      setAiError(err instanceof Error ? err.message : 'Generation failed');
+      const msg = err instanceof Error ? err.message : 'Generation failed';
+      setAiError(msg.includes('Load failed') || msg.includes('fetch') ? 'Request timed out — please try again' : msg);
     } finally {
       setGeneratingAI(false);
     }
@@ -242,6 +251,53 @@ export default function DesignStep({
     setCanvasDataUrl(canvas.toDataURL('image/png'));
   }, [sizeKey, themeKey, postText, companyName]);
 
+  async function pollVideo(jobId: string) {
+    try {
+      const res = await fetch(`/api/generate-video?jobId=${jobId}`);
+      const data = await res.json();
+      if (data.status === 'completed' && data.videoUrl) {
+        setVideoUrl(data.videoUrl);
+        setGeneratingVideo(false);
+      } else if (data.status === 'failed' || data.error) {
+        setVideoError(data.error || 'Video generation failed');
+        setGeneratingVideo(false);
+      } else {
+        pollRef.current = setTimeout(() => pollVideo(jobId), 4000);
+      }
+    } catch {
+      setVideoError('Failed to check video status');
+      setGeneratingVideo(false);
+    }
+  }
+
+  async function handleGenerateVideo() {
+    if (!aiImageUrl) return;
+    setGeneratingVideo(true);
+    setVideoError('');
+    setVideoUrl('');
+    if (pollRef.current) clearTimeout(pollRef.current);
+
+    const aspectRatio = sizeKey === 'story' ? '9:16' : sizeKey === 'instagram' ? '1:1' : '16:9';
+
+    try {
+      const res = await fetch('/api/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: aiImageUrl,
+          prompt: `Animate this professional ${companyCategory || 'business'} image with subtle cinematic motion, slow zoom, gentle parallax effect`,
+          aspectRatio,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to start video generation');
+      pollRef.current = setTimeout(() => pollVideo(data.jobId), 5000);
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : 'Failed to generate video');
+      setGeneratingVideo(false);
+    }
+  }
+
   async function handlePost() {
     if (!activeImageUrl) { setPostStatus('error'); setPostMessage('Generate an image first'); return; }
     setPosting(true); setPostStatus('idle');
@@ -260,30 +316,35 @@ export default function DesignStep({
         imageUrlToPost = (await imgRes.json()).url;
       }
 
+      // Step 1: fetch channels
       const chanRes = await fetch('/api/buffer/channel');
-      if (!chanRes.ok) throw new Error('Could not get Buffer channel');
-      const { channel } = await chanRes.json();
+      const chanData = await chanRes.json();
+      if (!chanRes.ok) throw new Error(`Channel error: ${chanData?.error || chanRes.status}`);
+      const channels: { id: string; name: string; service: string }[] = chanData?.channels ?? [];
+      if (channels.length === 0) throw new Error(`No channels returned. Raw: ${JSON.stringify(chanData)}`);
 
-      // Text Card mode: post image only, no caption
+      // Step 2: post to buffer
       const captionText = mode === 'text' ? '' : (postText || 'Posted via Social Media Manager');
-
       const postRes = await fetch('/api/buffer/post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          channelId: channel.id,
+          channelIds: channels,
           text: captionText,
           imageUrl: imageUrlToPost,
         }),
       });
-      if (!postRes.ok) throw new Error('Buffer post failed');
+      const postData = await postRes.json();
+      if (!postRes.ok) throw new Error(`Post error: ${postData?.error || postRes.status}`);
 
-      setPostStatus('success');
-      setPostMessage('Posted to Buffer!');
+      const channelNames = channels.map((c) => c.name).join(' & ');
+      const partial = postData.errors?.length ? ` | Failed: ${postData.errors.join('; ')}` : '';
+      setPostStatus(postData.posted === postData.total ? 'success' : 'error');
+      setPostMessage(`Posted to ${postData.posted}/${postData.total} channels (${channelNames})!${partial}`);
       onPostSuccess();
     } catch (err) {
       setPostStatus('error');
-      setPostMessage(err instanceof Error ? err.message : 'Post failed');
+      setPostMessage(err instanceof Error ? err.message : String(err));
     } finally {
       setPosting(false);
     }
@@ -335,6 +396,36 @@ export default function DesignStep({
                   className="w-full py-1.5 border border-indigo-300 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-50 disabled:opacity-40 transition-colors">
                   ↺ Regenerate
                 </button>
+
+                {/* Reel generation */}
+                <div className="border-t border-gray-100 pt-3">
+                  <button
+                    onClick={handleGenerateVideo}
+                    disabled={generatingVideo}
+                    className="w-full py-2.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {generatingVideo
+                      ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generating Reel… (30–60s)</>
+                      : '🎬 Generate Reel (~$0.25)'}
+                  </button>
+                  {videoError && (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-2">{videoError}</p>
+                  )}
+                  {videoUrl && (
+                    <div className="mt-2 space-y-2">
+                      <video src={videoUrl} controls playsInline className="w-full rounded-lg border border-gray-200 shadow-sm" />
+                      <a
+                        href={videoUrl}
+                        download="reel.mp4"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block w-full py-1.5 text-center border border-purple-300 text-purple-600 rounded-lg text-xs font-medium hover:bg-purple-50 transition-colors"
+                      >
+                        ↓ Download Reel
+                      </a>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </>

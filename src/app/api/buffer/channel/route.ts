@@ -2,13 +2,31 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-// Cache the channel to avoid repeated API calls (cleared on server restart)
-let cachedChannel: { id: string; name: string } | null = null;
+let cachedChannels: { id: string; name: string; service: string }[] | null = null;
+
+async function fetchChannels(headers: Record<string, string>, orgId: string) {
+  // Try with service field first; fall back to id+name only if schema doesn't support it
+  for (const query of [
+    `{ channels(input: { organizationId: "${orgId}" }) { id name service } }`,
+    `{ channels(input: { organizationId: "${orgId}" }) { id name } }`,
+  ]) {
+    const res = await fetch('https://api.buffer.com/rpc', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ query }),
+    });
+    if (!res.ok) continue;
+    const data = await res.json();
+    const channels = data?.data?.channels;
+    if (channels && channels.length > 0) return channels;
+  }
+  return null;
+}
 
 export async function GET() {
   try {
-    if (cachedChannel) {
-      return NextResponse.json({ channel: cachedChannel });
+    if (cachedChannels) {
+      return NextResponse.json({ channels: cachedChannels });
     }
 
     const token = process.env.BUFFER_API_TOKEN;
@@ -25,38 +43,28 @@ export async function GET() {
     const orgRes = await fetch('https://api.buffer.com/rpc', {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        query: `{ account { organizations { id } } }`,
-      }),
+      body: JSON.stringify({ query: `{ account { organizations { id } } }` }),
     });
-
     if (!orgRes.ok) throw new Error(`Buffer org fetch returned ${orgRes.status}`);
     const orgData = await orgRes.json();
     const orgId = orgData?.data?.account?.organizations?.[0]?.id;
     if (!orgId) throw new Error('No organization found in Buffer account');
 
-    // Step 2: Get channels for organization
-    const chanRes = await fetch('https://api.buffer.com/rpc', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        query: `{ channels(input: { organizationId: "${orgId}" }) { id name } }`,
-      }),
-    });
+    // Step 2: Get all channels
+    const channels = await fetchChannels(headers, orgId);
+    if (!channels) throw new Error('No channels found in Buffer account');
 
-    if (!chanRes.ok) throw new Error(`Buffer channels fetch returned ${chanRes.status}`);
-    const chanData = await chanRes.json();
-    const channels = chanData?.data?.channels;
-    if (!channels || channels.length === 0) throw new Error('No channels found');
+    cachedChannels = channels.map((c: { id: string; name: string; service?: string }) => ({
+      id: c.id,
+      name: c.name,
+      service: c.service ?? 'unknown',
+    }));
 
-    const channel = { id: channels[0].id, name: channels[0].name };
-    cachedChannel = channel;
-
-    return NextResponse.json({ channel });
+    return NextResponse.json({ channels: cachedChannels });
   } catch (err) {
     console.error('GET /api/buffer/channel error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to get Buffer channel' },
+      { error: err instanceof Error ? err.message : 'Failed to get Buffer channels' },
       { status: 500 }
     );
   }

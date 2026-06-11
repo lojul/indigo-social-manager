@@ -26,6 +26,7 @@ export default function SocialManager({ company }: SocialManagerProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [postText, setPostText] = useState('');
+  const [resetKey, setResetKey] = useState(0);
 
   const themeKey = (company.theme in THEMES ? company.theme : 'indigo') as ThemeKey;
   const theme = THEMES[themeKey];
@@ -40,11 +41,7 @@ export default function SocialManager({ company }: SocialManagerProps) {
     setCurrentStep(Math.max(currentStep, 1));
   }
 
-  function handleGoToDesign() {
-    setCurrentStep(Math.max(currentStep, 2));
-  }
-
-  function handlePostSuccess() {
+function handlePostSuccess() {
     setCurrentStep(3);
   }
 
@@ -52,6 +49,7 @@ export default function SocialManager({ company }: SocialManagerProps) {
     setSelectedTopic(null);
     setPostText('');
     setCurrentStep(0);
+    setResetKey(k => k + 1);
   }
 
   return (
@@ -113,7 +111,7 @@ export default function SocialManager({ company }: SocialManagerProps) {
             }`}
             onClick={() => setCurrentStep(0)}
           >
-            <SearchStep onTopicSelect={handleTopicSelect} companyCategory={company.category ?? ''} />
+            <SearchStep key={resetKey} onTopicSelect={handleTopicSelect} companyCategory={company.category ?? ''} />
           </div>
 
           {/* Col 2 – Write Post */}
@@ -123,6 +121,7 @@ export default function SocialManager({ company }: SocialManagerProps) {
             }`}
           >
             <WriteStep
+              key={resetKey}
               postText={postText}
               onPostTextChange={handlePostTextChange}
               selectedTopic={selectedTopic}
@@ -131,14 +130,6 @@ export default function SocialManager({ company }: SocialManagerProps) {
               companyCategory={company.category ?? ''}
               companyLanguage={company.language ?? 'en'}
             />
-            {postText && currentStep < 2 && (
-              <button
-                onClick={handleGoToDesign}
-                className="mt-3 w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-              >
-                Continue to Design →
-              </button>
-            )}
           </div>
 
           {/* Col 3 – Design & Publish */}
@@ -148,6 +139,7 @@ export default function SocialManager({ company }: SocialManagerProps) {
             }`}
           >
             <DesignStep
+              key={resetKey}
               postText={postText}
               companyTheme={company.theme}
               companyName={company.name}

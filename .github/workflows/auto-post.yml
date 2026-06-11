@@ -1,12 +1,7 @@
 name: Auto Generate Facebook Posts
 
 on:
-  schedule:
-    # Run 3 times daily at peak engagement times (HKT: 9am, 1pm, 7pm)
-    - cron: '0 1 * * *'   # 9:00 AM HKT (1:00 UTC)
-    - cron: '0 5 * * *'   # 1:00 PM HKT (5:00 UTC)
-    - cron: '0 11 * * *'  # 7:00 PM HKT (11:00 UTC)
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   generate-posts:

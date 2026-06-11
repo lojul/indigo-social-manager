@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+const HISTORY_KEY = 'search-history';
+const MAX_HISTORY = 8;
 
 export interface Topic {
   title: string;
@@ -40,8 +43,34 @@ export default function SearchStep({ onTopicSelect, companyCategory }: SearchSte
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [savedQueries, setSavedQueries] = useState<string[]>([]);
 
   const presets = getPresetTopics(companyCategory);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(HISTORY_KEY);
+      if (stored) setSavedQueries(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  function persistQuery(query: string) {
+    if (presets.includes(query)) return;
+    setSavedQueries(prev => {
+      const updated = [query, ...prev.filter(q => q !== query)].slice(0, MAX_HISTORY);
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  }
+
+  function removeQuery(query: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setSavedQueries(prev => {
+      const updated = prev.filter(q => q !== query);
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  }
 
   async function handleSearch(query: string) {
     if (!query.trim()) return;
@@ -66,7 +95,10 @@ export default function SearchStep({ onTopicSelect, companyCategory }: SearchSte
   }
 
   function handleCustomSearch() {
+    if (!customQuery.trim()) return;
+    persistQuery(customQuery.trim());
     handleSearch(customQuery);
+    setCustomQuery('');
   }
 
   return (
@@ -75,7 +107,7 @@ export default function SearchStep({ onTopicSelect, companyCategory }: SearchSte
         Search Topics
       </h2>
 
-      {/* Preset chips */}
+      {/* Preset chips + saved custom queries */}
       <div className="flex flex-wrap gap-2 mb-3">
         {presets.map((preset) => (
           <button
@@ -90,6 +122,31 @@ export default function SearchStep({ onTopicSelect, companyCategory }: SearchSte
           >
             {preset}
           </button>
+        ))}
+        {savedQueries.map((q) => (
+          <div key={q} className={`flex items-center rounded-full text-xs font-medium transition-all ${
+            activeQuery === q ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700'
+          } ${loading ? 'opacity-50' : ''}`}>
+            <button
+              onClick={() => handleSearch(q)}
+              disabled={loading}
+              className="pl-3 pr-1 py-1.5 hover:opacity-80 transition-opacity"
+            >
+              {q}
+            </button>
+            <button
+              onClick={(e) => removeQuery(q, e)}
+              disabled={loading}
+              className={`pr-2 pl-0.5 py-1.5 transition-opacity hover:opacity-60 ${
+                activeQuery === q ? 'text-white' : 'text-indigo-400'
+              }`}
+              aria-label="Remove"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         ))}
       </div>
 
