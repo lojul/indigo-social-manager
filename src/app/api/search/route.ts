@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     const normalised = query.trim();
 
-    const cached = await getCachedSearch(normalised);
+    const cached = await getCachedSearch(normalised, 6);
     if (cached) {
       return NextResponse.json({ results: cached, fromCache: true });
     }
@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
         topic: 'news',
         max_results: 6,
         search_depth: 'basic',
+        days: 3,
       }),
     });
 
