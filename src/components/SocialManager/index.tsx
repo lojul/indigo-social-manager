@@ -111,7 +111,7 @@ function handlePostSuccess() {
             }`}
             onClick={() => setCurrentStep(0)}
           >
-            <SearchStep key={resetKey} onTopicSelect={handleTopicSelect} companyCategory={company.category ?? ''} />
+            <SearchStep key={resetKey} onTopicSelect={handleTopicSelect} companyCategory={company.category ?? ''} companyId={company.id} />
           </div>
 
           {/* Col 2 – Write Post */}

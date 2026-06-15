@@ -33,6 +33,8 @@ async function ensureSchema() {
     )
   `;
 
+  await sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS custom_searches TEXT DEFAULT '[]'`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS generation_logs (
       id          SERIAL PRIMARY KEY,
@@ -66,6 +68,7 @@ export interface Company {
   url: string;
   description: string;
   language: string;
+  custom_searches: string;
   created_at: string;
 }
 
@@ -146,6 +149,32 @@ export async function clearSearchCache(): Promise<void> {
   await ensureSchema();
   const sql = getDb();
   await sql`DELETE FROM search_cache`;
+}
+
+export async function getCompanySearches(id: number): Promise<string[]> {
+  await ensureSchema();
+  const sql = getDb();
+  const rows = await sql`SELECT custom_searches FROM companies WHERE id = ${id}`;
+  if (!rows[0]) return [];
+  try { return JSON.parse(rows[0].custom_searches || '[]'); } catch { return []; }
+}
+
+export async function saveCompanySearch(id: number, query: string, max = 8): Promise<string[]> {
+  await ensureSchema();
+  const sql = getDb();
+  const current = await getCompanySearches(id);
+  const updated = [query, ...current.filter(q => q !== query)].slice(0, max);
+  await sql`UPDATE companies SET custom_searches = ${JSON.stringify(updated)} WHERE id = ${id}`;
+  return updated;
+}
+
+export async function removeCompanySearch(id: number, query: string): Promise<string[]> {
+  await ensureSchema();
+  const sql = getDb();
+  const current = await getCompanySearches(id);
+  const updated = current.filter(q => q !== query);
+  await sql`UPDATE companies SET custom_searches = ${JSON.stringify(updated)} WHERE id = ${id}`;
+  return updated;
 }
 
 export async function logGeneration(

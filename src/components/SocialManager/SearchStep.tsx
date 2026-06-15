@@ -13,6 +13,7 @@ export interface Topic {
 interface SearchStepProps {
   onTopicSelect: (topic: Topic) => void;
   companyCategory: string;
+  companyId: number;
 }
 
 const TOPIC_MAP: Record<string, string[]> = {
@@ -37,7 +38,7 @@ function getPresetTopics(category: string): string[] {
     : ['business innovation news', 'startup funding this week', 'industry growth report'];
 }
 
-export default function SearchStep({ onTopicSelect, companyCategory }: SearchStepProps) {
+export default function SearchStep({ onTopicSelect, companyCategory, companyId }: SearchStepProps) {
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
   const [customQuery, setCustomQuery] = useState('');
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -47,29 +48,71 @@ export default function SearchStep({ onTopicSelect, companyCategory }: SearchSte
 
   const presets = getPresetTopics(companyCategory);
 
+  // Load from DB on mount, fall back to localStorage
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(HISTORY_KEY);
-      if (stored) setSavedQueries(JSON.parse(stored));
-    } catch {}
-  }, []);
+    fetch(`/api/companies/${companyId}/searches`)
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.searches) && d.searches.length > 0) {
+          setSavedQueries(d.searches);
+          try { localStorage.setItem(HISTORY_KEY, JSON.stringify(d.searches)); } catch {}
+        } else {
+          const stored = localStorage.getItem(HISTORY_KEY);
+          if (stored) setSavedQueries(JSON.parse(stored));
+        }
+      })
+      .catch(() => {
+        try {
+          const stored = localStorage.getItem(HISTORY_KEY);
+          if (stored) setSavedQueries(JSON.parse(stored));
+        } catch {}
+      });
+  }, [companyId]);
 
   function persistQuery(query: string) {
     if (presets.includes(query)) return;
-    setSavedQueries(prev => {
-      const updated = [query, ...prev.filter(q => q !== query)].slice(0, MAX_HISTORY);
-      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
-      return updated;
-    });
+    fetch(`/api/companies/${companyId}/searches`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.searches)) {
+          setSavedQueries(d.searches);
+          try { localStorage.setItem(HISTORY_KEY, JSON.stringify(d.searches)); } catch {}
+        }
+      })
+      .catch(() => {
+        setSavedQueries(prev => {
+          const updated = [query, ...prev.filter(q => q !== query)].slice(0, MAX_HISTORY);
+          try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
+          return updated;
+        });
+      });
   }
 
   function removeQuery(query: string, e: React.MouseEvent) {
     e.stopPropagation();
-    setSavedQueries(prev => {
-      const updated = prev.filter(q => q !== query);
-      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
-      return updated;
-    });
+    fetch(`/api/companies/${companyId}/searches`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.searches)) {
+          setSavedQueries(d.searches);
+          try { localStorage.setItem(HISTORY_KEY, JSON.stringify(d.searches)); } catch {}
+        }
+      })
+      .catch(() => {
+        setSavedQueries(prev => {
+          const updated = prev.filter(q => q !== query);
+          try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
+          return updated;
+        });
+      });
   }
 
   async function handleSearch(query: string) {
