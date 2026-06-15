@@ -96,7 +96,7 @@ async function generateImageBase64(prompt: string, azureKey: string, azureEndpoi
       method: 'POST',
       headers: { 'api-key': azureKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, quality: 'low', size: '1024x1024' }),
-      signal: AbortSignal.timeout(50000),
+      signal: AbortSignal.timeout(54000),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

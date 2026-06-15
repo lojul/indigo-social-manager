@@ -203,7 +203,11 @@ export default function DesignStep({
       setAiPrompt(data.prompt);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Generation failed';
-      setAiError(msg.includes('Load failed') || msg.includes('fetch') ? 'Request timed out — please try again' : msg);
+      setAiError(
+        msg.includes('Load failed') || msg.includes('fetch') || msg.includes('timed out') || msg.includes('timeout') || msg.includes('aborted')
+          ? 'Azure is slow right now — please try again'
+          : msg
+      );
     } finally {
       setGeneratingAI(false);
     }
