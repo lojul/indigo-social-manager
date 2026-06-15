@@ -65,9 +65,10 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
     const results = (data.results || [])
-      .map((r: { title?: string; content?: string }) => ({
+      .map((r: { title?: string; content?: string; published_date?: string }) => ({
         title: r.title?.trim() || '',
         summary: r.content ? cleanContent(r.content) : '',
+        publishedDate: r.published_date ?? null,
       }))
       .filter(
         (r: { title: string; summary: string }) =>

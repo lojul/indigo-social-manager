@@ -8,6 +8,7 @@ const MAX_HISTORY = 8;
 export interface Topic {
   title: string;
   summary: string;
+  publishedDate?: string | null;
 }
 
 interface SearchStepProps {
@@ -29,6 +30,19 @@ const TOPIC_MAP: Record<string, string[]> = {
   'Manufacturing':         ['factory automation investment news', 'supply chain disruption report', 'industrial AI adoption'],
   'Non-profit / NGO':      ['nonprofit fundraising record campaigns', 'social enterprise impact report', 'ESG corporate donation trends'],
 };
+
+function formatDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+  } catch { return ''; }
+}
 
 function getPresetTopics(category: string): string[] {
   if (category in TOPIC_MAP) return TOPIC_MAP[category];
@@ -231,9 +245,16 @@ export default function SearchStep({ onTopicSelect, companyCategory, companyId }
             onClick={() => onTopicSelect(topic)}
             className="w-full text-left p-3 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-lg transition-all group"
           >
-            <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-700 leading-tight mb-1">
-              {topic.title}
-            </p>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-700 leading-tight">
+                {topic.title}
+              </p>
+              {topic.publishedDate && (
+                <span className="flex-shrink-0 text-xs text-gray-400 mt-0.5">
+                  {formatDate(topic.publishedDate)}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500 leading-snug line-clamp-2">
               {topic.summary}
             </p>
