@@ -33,6 +33,18 @@ async function ensureSchema() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS generation_logs (
+      id          SERIAL PRIMARY KEY,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      company_id  INT REFERENCES companies(id) ON DELETE SET NULL,
+      type        TEXT NOT NULL,
+      model       TEXT NOT NULL,
+      cost_usd    NUMERIC(10, 6) DEFAULT 0,
+      meta        JSONB DEFAULT '{}'
+    )
+  `;
+
   const rows = await sql`SELECT COUNT(*) AS c FROM companies`;
   if (parseInt(rows[0].c) === 0) {
     await sql`
@@ -134,4 +146,89 @@ export async function clearSearchCache(): Promise<void> {
   await ensureSchema();
   const sql = getDb();
   await sql`DELETE FROM search_cache`;
+}
+
+export async function logGeneration(
+  type: string,
+  model: string,
+  costUsd: number,
+  companyId?: number | null,
+  meta?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    const sql = getDb();
+    await sql`
+      INSERT INTO generation_logs (type, model, cost_usd, company_id, meta)
+      VALUES (${type}, ${model}, ${costUsd}, ${companyId ?? null}, ${JSON.stringify(meta ?? {})})
+    `;
+  } catch (err) {
+    console.error('logGeneration failed (non-fatal):', err);
+  }
+}
+
+export interface BillingMonth {
+  month: string;
+  total_usd: number;
+  image_usd: number;
+  video_usd: number;
+  image_count: number;
+  video_count: number;
+}
+
+export interface BillingCompany {
+  company_id: number | null;
+  company_name: string;
+  total_usd: number;
+  image_count: number;
+  video_count: number;
+}
+
+export async function getBillingStats(months = 3): Promise<{
+  monthly: BillingMonth[];
+  by_company: BillingCompany[];
+  total_usd: number;
+}> {
+  await ensureSchema();
+  const sql = getDb();
+
+  const monthly = await sql`
+    SELECT
+      TO_CHAR(created_at, 'YYYY-MM') AS month,
+      ROUND(SUM(cost_usd)::numeric, 4) AS total_usd,
+      ROUND(SUM(CASE WHEN type = 'image' THEN cost_usd ELSE 0 END)::numeric, 4) AS image_usd,
+      ROUND(SUM(CASE WHEN type = 'video' THEN cost_usd ELSE 0 END)::numeric, 4) AS video_usd,
+      COUNT(CASE WHEN type = 'image' THEN 1 END)::int AS image_count,
+      COUNT(CASE WHEN type = 'video' THEN 1 END)::int AS video_count
+    FROM generation_logs
+    WHERE created_at >= NOW() - (${months} || ' months')::interval
+    GROUP BY month
+    ORDER BY month DESC
+  `;
+
+  const by_company = await sql`
+    SELECT
+      g.company_id,
+      COALESCE(c.name, 'Unknown') AS company_name,
+      ROUND(SUM(g.cost_usd)::numeric, 4) AS total_usd,
+      COUNT(CASE WHEN g.type = 'image' THEN 1 END)::int AS image_count,
+      COUNT(CASE WHEN g.type = 'video' THEN 1 END)::int AS video_count
+    FROM generation_logs g
+    LEFT JOIN companies c ON c.id = g.company_id
+    WHERE g.created_at >= NOW() - (${months} || ' months')::interval
+    GROUP BY g.company_id, c.name
+    ORDER BY total_usd DESC
+  `;
+
+  const totals = await sql`
+    SELECT ROUND(SUM(cost_usd)::numeric, 4) AS total_usd
+    FROM generation_logs
+    WHERE created_at >= NOW() - (${months} || ' months')::interval
+  `;
+
+  return {
+    monthly: monthly as BillingMonth[],
+    by_company: by_company as BillingCompany[],
+    total_usd: Number(totals[0]?.total_usd ?? 0),
+  };
 }

@@ -109,6 +109,7 @@ interface DesignStepProps {
   companyTheme: string;
   companyName: string;
   companyLanguage: string;
+  companyId: number;
   companyCategory?: string;
   selectedTopicTitle?: string;
   selectedTopicSummary?: string;
@@ -116,7 +117,7 @@ interface DesignStepProps {
 }
 
 export default function DesignStep({
-  postText, companyTheme, companyName, companyCategory,
+  postText, companyTheme, companyName, companyCategory, companyId,
   selectedTopicTitle, selectedTopicSummary, onPostSuccess,
 }: DesignStepProps) {
   const [mode, setMode] = useState<Mode>('ai');
@@ -137,16 +138,46 @@ export default function DesignStep({
 
   // Video / Reel state
   const [videoUrl, setVideoUrl] = useState('');
+  const [blobVideoUrl, setBlobVideoUrl] = useState('');
+  const [loadingBlob, setLoadingBlob] = useState(false);
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [videoError, setVideoError] = useState('');
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blobRef = useRef('');
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
+
+  // When videoUrl arrives, fetch through proxy and create a playable blob URL
+  useEffect(() => {
+    if (!videoUrl) { setBlobVideoUrl(''); return; }
+    const proxyUrl = videoUrl.startsWith('https://openrouter.ai/')
+      ? `/api/generate-video-proxy?url=${encodeURIComponent(videoUrl)}`
+      : videoUrl;
+    let cancelled = false;
+    setLoadingBlob(true);
+    fetch(proxyUrl)
+      .then(r => r.blob())
+      .then(blob => {
+        if (cancelled) return;
+        if (blobRef.current) URL.revokeObjectURL(blobRef.current);
+        const url = URL.createObjectURL(blob);
+        blobRef.current = url;
+        setBlobVideoUrl(url);
+      })
+      .catch(() => { if (!cancelled) setBlobVideoUrl(proxyUrl); })
+      .finally(() => { if (!cancelled) setLoadingBlob(false); });
+    return () => { cancelled = true; };
+  }, [videoUrl]);
+
+  useEffect(() => () => { if (blobRef.current) URL.revokeObjectURL(blobRef.current); }, []);
 
   // Post state
   const [posting, setPosting] = useState(false);
   const [postStatus, setPostStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [postMessage, setPostMessage] = useState('');
+  const [postingReel, setPostingReel] = useState(false);
+  const [reelPostStatus, setReelPostStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [reelPostMessage, setReelPostMessage] = useState('');
 
   const activeImageUrl = mode === 'ai' ? aiImageUrl : canvasDataUrl;
   const canGenerate = !!(selectedTopicTitle || postText.trim());
@@ -162,7 +193,7 @@ export default function DesignStep({
         body: JSON.stringify({
           title: selectedTopicTitle || postText.split('\n')[0],
           summary: selectedTopicSummary || postText.slice(0, 300),
-          companyName, companyCategory,
+          companyName, companyCategory, companyId,
           width: size.width, height: size.height,
         }),
       });
@@ -253,16 +284,20 @@ export default function DesignStep({
 
   async function pollVideo(jobId: string) {
     try {
-      const res = await fetch(`/api/generate-video?jobId=${jobId}`);
+      const res = await fetch(`/api/generate-video?jobId=${encodeURIComponent(jobId)}&companyId=${companyId}`);
       const data = await res.json();
       if (data.status === 'completed' && data.videoUrl) {
         setVideoUrl(data.videoUrl);
         setGeneratingVideo(false);
-      } else if (data.status === 'failed' || data.error) {
-        setVideoError(data.error || 'Video generation failed');
+      } else if (data.status === 'failed' || data.status === 'cancelled' || data.status === 'expired') {
+        const reason = data.failureReason ? `: ${data.failureReason}` : '';
+        setVideoError(`Video generation ${data.status}${reason}`);
+        setGeneratingVideo(false);
+      } else if (data.error) {
+        setVideoError(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
         setGeneratingVideo(false);
       } else {
-        pollRef.current = setTimeout(() => pollVideo(jobId), 4000);
+        pollRef.current = setTimeout(() => pollVideo(jobId), 15000);
       }
     } catch {
       setVideoError('Failed to check video status');
@@ -291,7 +326,8 @@ export default function DesignStep({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to start video generation');
-      pollRef.current = setTimeout(() => pollVideo(data.jobId), 5000);
+      // Wait 15s before first poll — OpenRouter/xAI needs time to register the job
+      pollRef.current = setTimeout(() => pollVideo(data.jobId), 15000);
     } catch (err) {
       setVideoError(err instanceof Error ? err.message : 'Failed to generate video');
       setGeneratingVideo(false);
@@ -350,6 +386,52 @@ export default function DesignStep({
     }
   }
 
+  async function handlePostReel() {
+    if (!videoUrl) { setReelPostStatus('error'); setReelPostMessage('Generate a reel first'); return; }
+    setPostingReel(true); setReelPostStatus('idle');
+    try {
+      // Upload to Vercel Blob for a stable public URL
+      const uploadRes = await fetch('/api/upload-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl }),
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Video upload failed');
+
+      // Fetch channels
+      const chanRes = await fetch('/api/buffer/channel');
+      const chanData = await chanRes.json();
+      if (!chanRes.ok) throw new Error(`Channel error: ${chanData?.error || chanRes.status}`);
+      const channels: { id: string; name: string; service: string }[] = chanData?.channels ?? [];
+      if (channels.length === 0) throw new Error('No channels returned');
+
+      // Post reel to Buffer
+      const postRes = await fetch('/api/buffer/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelIds: channels,
+          text: postText || 'Posted via Social Media Manager',
+          videoUrl: uploadData.blobUrl,
+        }),
+      });
+      const postData = await postRes.json();
+      if (!postRes.ok) throw new Error(`Post error: ${postData?.error || postRes.status}`);
+
+      const channelNames = channels.map((c) => c.name).join(' & ');
+      const partial = postData.errors?.length ? ` | Failed: ${postData.errors.join('; ')}` : '';
+      setReelPostStatus(postData.posted === postData.total ? 'success' : 'error');
+      setReelPostMessage(`Reel posted to ${postData.posted}/${postData.total} channels (${channelNames})!${partial}`);
+      onPostSuccess();
+    } catch (err) {
+      setReelPostStatus('error');
+      setReelPostMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPostingReel(false);
+    }
+  }
+
   return (
     <div>
       <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
@@ -396,36 +478,6 @@ export default function DesignStep({
                   className="w-full py-1.5 border border-indigo-300 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-50 disabled:opacity-40 transition-colors">
                   ↺ Regenerate
                 </button>
-
-                {/* Reel generation */}
-                <div className="border-t border-gray-100 pt-3">
-                  <button
-                    onClick={handleGenerateVideo}
-                    disabled={generatingVideo}
-                    className="w-full py-2.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                  >
-                    {generatingVideo
-                      ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generating Reel… (30–60s)</>
-                      : '🎬 Generate Reel (~$0.25)'}
-                  </button>
-                  {videoError && (
-                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-2">{videoError}</p>
-                  )}
-                  {videoUrl && (
-                    <div className="mt-2 space-y-2">
-                      <video src={videoUrl} controls playsInline className="w-full rounded-lg border border-gray-200 shadow-sm" />
-                      <a
-                        href={videoUrl}
-                        download="reel.mp4"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block w-full py-1.5 text-center border border-purple-300 text-purple-600 rounded-lg text-xs font-medium hover:bg-purple-50 transition-colors"
-                      >
-                        ↓ Download Reel
-                      </a>
-                    </div>
-                  )}
-                </div>
               </>
             )}
           </>
@@ -474,6 +526,59 @@ export default function DesignStep({
         {postStatus !== 'idle' && (
           <div className={`p-3 rounded-lg text-sm ${postStatus === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
             {postMessage}
+          </div>
+        )}
+
+        {/* ── Reel section (AI mode only, after image is generated) ── */}
+        {mode === 'ai' && aiImageUrl && (
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <button
+              onClick={handleGenerateVideo}
+              disabled={generatingVideo}
+              className="w-full py-2.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            >
+              {generatingVideo
+                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generating Reel… (30–60s)</>
+                : '🎬 Generate Reel (~$0.63)'}
+            </button>
+            {videoError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{videoError}</p>
+            )}
+            {videoUrl && (
+              <>
+                {loadingBlob ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-500 py-2">
+                    <span className="w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                    Loading video…
+                  </div>
+                ) : blobVideoUrl ? (
+                  <video src={blobVideoUrl} controls playsInline className="w-full rounded-lg border border-gray-200 shadow-sm" />
+                ) : null}
+                <a
+                  href={videoUrl.startsWith('https://openrouter.ai/')
+                    ? `/api/generate-video-proxy?url=${encodeURIComponent(videoUrl)}&download=1`
+                    : videoUrl}
+                  download="reel.mp4"
+                  className="block w-full py-1.5 text-center border border-purple-300 text-purple-600 rounded-lg text-xs font-medium hover:bg-purple-50 transition-colors"
+                >
+                  ↓ Download Reel
+                </a>
+                <button
+                  onClick={handlePostReel}
+                  disabled={postingReel}
+                  className="w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {postingReel
+                    ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading & Posting…</>
+                    : '▶ Post Reel to Buffer'}
+                </button>
+                {reelPostStatus !== 'idle' && (
+                  <div className={`p-2 rounded-lg text-xs ${reelPostStatus === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                    {reelPostMessage}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

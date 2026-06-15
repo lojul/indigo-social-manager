@@ -8,12 +8,16 @@ async function postToChannel(
   text: string,
   imageUrl: string | undefined,
   token: string,
+  videoUrl?: string,
 ) {
-  const assets = imageUrl ? [{ image: { url: imageUrl } }] : [];
+  const isReel = !!videoUrl;
+  const assets = videoUrl
+    ? [{ video: { url: videoUrl } }]
+    : imageUrl ? [{ image: { url: imageUrl } }] : [];
 
   const metadata: Record<string, unknown> = {};
-  if (service === 'facebook') metadata.facebook = { type: 'post' };
-  if (service === 'instagram') metadata.instagram = { type: 'post', shouldShareToFeed: true };
+  if (service === 'facebook') metadata.facebook = { type: isReel ? 'reel' : 'post' };
+  if (service === 'instagram') metadata.instagram = { type: isReel ? 'reel' : 'post', shouldShareToFeed: true };
 
   const mutation = `
     mutation CreatePost($input: CreatePostInput!) {
@@ -24,7 +28,7 @@ async function postToChannel(
         ... on InvalidInputError { message }
         ... on UnexpectedError { message }
         ... on LimitReachedError { message }
-        ... on RestProxyError { message }
+        ... on RestProxyError { message link code }
       }
     }
   `;
@@ -60,7 +64,7 @@ async function postToChannel(
 
   const result = data?.data?.createPost;
   if (!result) throw new Error(`No createPost result (${service})`);
-  if (result.message) throw new Error(result.message);
+  if (result.message) throw new Error(`${result.message}${result.code ? ` [code: ${result.code}]` : ''}${result.link ? ` — ${result.link}` : ''}`);
   if (!result.post?.id) throw new Error(`Post not queued (${service}): ${JSON.stringify(result)}`);
 
   return { channelId, service, success: true };
@@ -68,7 +72,7 @@ async function postToChannel(
 
 export async function POST(req: NextRequest) {
   try {
-    const { channelIds, text, imageUrl } = await req.json();
+    const { channelIds, text, imageUrl, videoUrl } = await req.json();
 
     if (!channelIds || channelIds.length === 0) {
       return NextResponse.json({ error: 'channelIds is required' }, { status: 400 });
@@ -87,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     const results = await Promise.allSettled(
       validChannels.map(({ id, service }: { id: string; service: string }) =>
-        postToChannel(id, service ?? 'unknown', text, imageUrl, token)
+        postToChannel(id, service ?? 'unknown', text, imageUrl, token, videoUrl)
       )
     );
 

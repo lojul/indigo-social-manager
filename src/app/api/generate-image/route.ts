@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logGeneration } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -94,7 +95,7 @@ async function generateImageBase64(prompt: string, azureKey: string, azureEndpoi
     res = await fetch(azureEndpoint, {
       method: 'POST',
       headers: { 'api-key': azureKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, quality: 'low', size: '1024x1024' }),
       signal: AbortSignal.timeout(50000),
     });
   } catch (err) {
@@ -115,7 +116,7 @@ async function generateImageBase64(prompt: string, azureKey: string, azureEndpoi
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, summary, companyCategory, width = 1080, height = 1080 } = await req.json();
+    const { title, summary, companyCategory, companyId, width = 1080, height = 1080 } = await req.json();
 
     if (!title) return NextResponse.json({ error: 'title is required' }, { status: 400 });
 
@@ -150,6 +151,10 @@ export async function POST(req: NextRequest) {
     const uploadData = await uploadRes.json();
     const imageUrl = uploadData?.data?.url;
     if (!imageUrl) throw new Error('No URL returned from imgbb');
+
+    await logGeneration('image', 'gpt-image-1-mini', 0.04, companyId ?? null, {
+      imageUrl, size: `${width}x${height}`,
+    });
 
     return NextResponse.json({ imageUrl, prompt: fullPrompt });
   } catch (err) {

@@ -145,6 +145,7 @@ function handlePostSuccess() {
               companyName={company.name}
               companyLanguage={company.language ?? 'en'}
               companyCategory={company.category ?? ''}
+              companyId={company.id}
               selectedTopicTitle={selectedTopic?.title}
               selectedTopicSummary={selectedTopic?.summary}
               onPostSuccess={handlePostSuccess}
