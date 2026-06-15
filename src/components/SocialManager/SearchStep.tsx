@@ -9,6 +9,7 @@ export interface Topic {
   title: string;
   summary: string;
   publishedDate?: string | null;
+  url?: string | null;
 }
 
 interface SearchStepProps {

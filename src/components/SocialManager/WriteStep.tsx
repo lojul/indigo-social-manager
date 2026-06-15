@@ -26,9 +26,13 @@ export default function WriteStep({
   const [translating, setTranslating] = useState<'zh-TW' | 'zh-CN' | null>(null);
   const [genError, setGenError] = useState('');
 
+  function sourceFooter(url?: string | null) {
+    return url ? `\n\nSource: ${url}` : '';
+  }
+
   function useDraft() {
     if (!selectedTopic) return;
-    onPostTextChange(`${selectedTopic.title}\n\n${selectedTopic.summary}`);
+    onPostTextChange(`${selectedTopic.title}\n\n${selectedTopic.summary}${sourceFooter(selectedTopic.url)}`);
     setGenError('');
   }
 
@@ -51,7 +55,7 @@ export default function WriteStep({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Generation failed');
-      onPostTextChange(data.post);
+      onPostTextChange(`${data.post}${sourceFooter(selectedTopic.url)}`);
     } catch (err) {
       setGenError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
@@ -63,9 +67,11 @@ export default function WriteStep({
     if (!postText.trim()) return;
     setTranslating(targetLang);
     try {
-      // Strip hashtags so they don't corrupt the translation, re-append after
+      // Strip hashtags and source URL before translating, re-append after
       const hashtags = (postText.match(/#\S+/g) || []).join(' ');
-      const body = postText.replace(/#\S+/g, '').trim();
+      const sourceMatch = postText.match(/\n\nSource: (https?:\/\/\S+)/);
+      const sourceUrl = sourceMatch ? sourceMatch[0] : '';
+      const body = postText.replace(/#\S+/g, '').replace(/\n\nSource: https?:\/\/\S+/, '').trim();
 
       const res = await fetch('/api/translate', {
         method: 'POST',
@@ -74,7 +80,8 @@ export default function WriteStep({
       });
       const data = await res.json();
       if (data.translated) {
-        onPostTextChange(hashtags ? `${data.translated}\n\n${hashtags}` : data.translated);
+        const parts = [data.translated, hashtags, sourceUrl].filter(Boolean);
+        onPostTextChange(parts.join('\n\n').replace(/\n\n\n\n/g, '\n\n'));
       }
     } catch {
       // silently fail
