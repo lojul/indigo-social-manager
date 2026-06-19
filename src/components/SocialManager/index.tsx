@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { THEMES, ThemeKey } from '@/lib/themes';
-import Stepper from './Stepper';
 import SearchStep, { Topic } from './SearchStep';
 import WriteStep from './WriteStep';
 import DesignStep from './DesignStep';
@@ -18,153 +18,192 @@ interface Company {
   language: string;
 }
 
-interface SocialManagerProps {
-  company: Company;
-}
+const STEPS = ['search', 'write', 'design'] as const;
+type Step = (typeof STEPS)[number];
 
-export default function SocialManager({ company }: SocialManagerProps) {
-  const [currentStep, setCurrentStep] = useState(0);
+const STEP_LABELS: Record<Step, string> = {
+  search: 'Find a Topic',
+  write: 'Write Post',
+  design: 'Design & Publish',
+};
+
+export default function SocialManager({ company }: { company: Company }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawStep = searchParams.get('step') as Step | null;
+  const step: Step = STEPS.includes(rawStep as Step) ? (rawStep as Step) : 'search';
+  const stepIndex = STEPS.indexOf(step);
+
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [postText, setPostText] = useState('');
   const [resetKey, setResetKey] = useState(0);
+  const [published, setPublished] = useState(false);
 
   const themeKey = (company.theme in THEMES ? company.theme : 'indigo') as ThemeKey;
   const theme = THEMES[themeKey];
+  const initials = company.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
-  function handleTopicSelect(topic: Topic) {
-    setSelectedTopic(topic);
-    setCurrentStep(Math.max(currentStep, 1));
+  function goToStep(s: Step) {
+    router.push(`/social/company/${company.id}?step=${s}`);
   }
 
-  function handlePostTextChange(text: string) {
-    setPostText(text);
-    setCurrentStep(Math.max(currentStep, 1));
+  function canGoNext(): boolean {
+    if (step === 'search') return selectedTopic !== null;
+    if (step === 'write') return postText.trim().length > 0;
+    return false;
   }
 
-function handlePostSuccess() {
-    setCurrentStep(3);
+  function handleBack() {
+    if (stepIndex === 0) {
+      router.push('/social');
+    } else {
+      goToStep(STEPS[stepIndex - 1]);
+    }
   }
 
-  function handleClearAll() {
+  function handleReset() {
     setSelectedTopic(null);
     setPostText('');
-    setCurrentStep(0);
+    setPublished(false);
     setResetKey(k => k + 1);
+    router.push(`/social/company/${company.id}`);
+  }
+
+  if (published) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-5">
+          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-1">Post queued in Buffer!</h2>
+        <p className="text-sm text-gray-500 mb-6">Your post has been added to the publishing queue.</p>
+        <button
+          onClick={handleReset}
+          className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+        >
+          Create another post
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/social"
-              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back
+    <div className="flex flex-col min-h-[calc(100vh-3rem)]">
+      {/* Breadcrumb / context bar */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <Link href="/social" className="text-gray-400 hover:text-gray-600 transition-colors">
+              Companies
             </Link>
-            <h1 className="text-lg font-semibold text-gray-900">Social Manager</h1>
-            <span
-              className="px-3 py-1 rounded-full text-xs font-semibold text-white"
-              style={{ backgroundColor: theme.bg }}
-            >
-              {company.name}
-            </span>
+            <span className="text-gray-200">/</span>
+            <div className="flex items-center gap-1.5">
+              <div
+                className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold"
+                style={{ backgroundColor: theme.bg }}
+              >
+                {initials}
+              </div>
+              <span className="font-medium text-gray-700">{company.name}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/social/company/${company.id}/settings`}
-              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors"
-              title="Company Settings"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              Settings
-            </Link>
-            <button
-              onClick={handleClearAll}
-              className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              Clear All
-            </button>
+          <Link
+            href={`/social/company/${company.id}/settings`}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Settings
+          </Link>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-3xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+              Step {stepIndex + 1} of {STEPS.length}
+            </p>
+            <p className="text-xs text-gray-500 font-medium">{STEP_LABELS[step]}</p>
+          </div>
+          <div className="flex gap-1.5">
+            {STEPS.map((s, i) => (
+              <div
+                key={s}
+                className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                  i <= stepIndex ? 'bg-indigo-500' : 'bg-gray-100'
+                }`}
+              />
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        {/* Stepper */}
-        <Stepper currentStep={currentStep} />
-
-        {/* 3-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Col 1 – Search Topics */}
-          <div
-            className={`bg-white rounded-xl p-5 shadow-sm transition-all ${
-              currentStep >= 0 ? 'ring-2 ring-indigo-200' : ''
-            }`}
-            onClick={() => setCurrentStep(0)}
-          >
-            <SearchStep key={resetKey} onTopicSelect={handleTopicSelect} companyCategory={company.category ?? ''} companyId={company.id} />
-          </div>
-
-          {/* Col 2 – Write Post */}
-          <div
-            className={`bg-white rounded-xl p-5 shadow-sm transition-all ${
-              currentStep >= 1 ? 'ring-2 ring-indigo-200' : ''
-            }`}
-          >
-            <WriteStep
-              key={resetKey}
-              postText={postText}
-              onPostTextChange={handlePostTextChange}
-              selectedTopic={selectedTopic}
-              companyName={company.name}
-              companyDescription={company.description ?? ''}
-              companyCategory={company.category ?? ''}
-              companyLanguage={company.language ?? 'en'}
-            />
-          </div>
-
-          {/* Col 3 – Design & Publish */}
-          <div
-            className={`bg-white rounded-xl p-5 shadow-sm transition-all ${
-              currentStep >= 2 ? 'ring-2 ring-indigo-200' : ''
-            }`}
-          >
-            <DesignStep
-              key={resetKey}
-              postText={postText}
-              companyTheme={company.theme}
-              companyName={company.name}
-              companyLanguage={company.language ?? 'en'}
-              companyCategory={company.category ?? ''}
-              companyId={company.id}
-              selectedTopicTitle={selectedTopic?.title}
-              selectedTopicSummary={selectedTopic?.summary}
-              onPostSuccess={handlePostSuccess}
-            />
-          </div>
-        </div>
-
-        {/* Success banner */}
-        {currentStep === 3 && (
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl text-center">
-            <p className="text-green-700 font-medium">Post published to Buffer!</p>
-            <button
-              onClick={handleClearAll}
-              className="mt-2 text-sm text-green-600 hover:text-green-800 underline"
-            >
-              Start a new post
-            </button>
-          </div>
+      {/* Step content */}
+      <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-8">
+        {step === 'search' && (
+          <SearchStep
+            key={resetKey}
+            onTopicSelect={setSelectedTopic}
+            companyCategory={company.category ?? ''}
+            companyId={company.id}
+          />
         )}
+        {step === 'write' && (
+          <WriteStep
+            key={resetKey}
+            postText={postText}
+            onPostTextChange={setPostText}
+            selectedTopic={selectedTopic}
+            companyName={company.name}
+            companyDescription={company.description ?? ''}
+            companyCategory={company.category ?? ''}
+            companyLanguage={company.language ?? 'en'}
+          />
+        )}
+        {step === 'design' && (
+          <DesignStep
+            key={resetKey}
+            postText={postText}
+            companyTheme={company.theme}
+            companyName={company.name}
+            companyLanguage={company.language ?? 'en'}
+            companyCategory={company.category ?? ''}
+            companyId={company.id}
+            selectedTopicTitle={selectedTopic?.title}
+            selectedTopicSummary={selectedTopic?.summary}
+            onPostSuccess={() => setPublished(true)}
+          />
+        )}
+      </div>
+
+      {/* Bottom navigation */}
+      <div className="bg-white border-t border-gray-100 px-6 py-4">
+        <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            {stepIndex === 0 ? 'All companies' : 'Back'}
+          </button>
+
+          {stepIndex < STEPS.length - 1 && (
+            <button
+              onClick={() => goToStep(STEPS[stepIndex + 1])}
+              disabled={!canGoNext()}
+              className="flex items-center gap-1.5 px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Continue
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

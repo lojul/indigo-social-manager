@@ -1,25 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import NextAuth from 'next-auth'
+import { authConfig } from './auth.config'
 
-const PUBLIC_PATHS = ['/login', '/api/auth/login'];
-
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
-    return NextResponse.next();
-  }
-
-  const session = req.cookies.get('admin_session');
-  if (!session || session.value !== process.env.ADMIN_SESSION_SECRET) {
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = '/login';
-    loginUrl.searchParams.set('from', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
-}
+export const { auth: middleware } = NextAuth(authConfig)
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-};
+}

@@ -47,6 +47,44 @@ async function ensureSchema() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id             TEXT NOT NULL DEFAULT gen_random_uuid()::TEXT,
+      name           TEXT,
+      email          TEXT UNIQUE,
+      "emailVerified" TIMESTAMPTZ,
+      image          TEXT,
+      PRIMARY KEY (id)
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id                  TEXT NOT NULL,
+      "userId"            TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type                TEXT NOT NULL,
+      provider            TEXT NOT NULL,
+      "providerAccountId" TEXT NOT NULL,
+      refresh_token       TEXT,
+      access_token        TEXT,
+      expires_at          INTEGER,
+      id_token            TEXT,
+      scope               TEXT,
+      session_state       TEXT,
+      token_type          TEXT,
+      PRIMARY KEY (id)
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS verification_tokens (
+      identifier TEXT NOT NULL,
+      expires    TIMESTAMPTZ NOT NULL,
+      token      TEXT NOT NULL,
+      PRIMARY KEY (identifier, token)
+    )
+  `;
+
   const rows = await sql`SELECT COUNT(*) AS c FROM companies`;
   if (parseInt(rows[0].c) === 0) {
     await sql`
