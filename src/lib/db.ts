@@ -85,16 +85,19 @@ async function ensureSchema() {
     )
   `;
 
-  const rows = await sql`SELECT COUNT(*) AS c FROM companies`;
-  if (parseInt(rows[0].c) === 0) {
-    await sql`
-      INSERT INTO companies (name, tagline, theme)
-      VALUES ('Indigo Tech Foundry', 'AI-powered social media solutions', 'indigo')
-    `;
-  }
+  // SaaS migrations
+  await sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS buffer_api_token TEXT`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'free'`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS posts_this_month INT DEFAULT 0`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS posts_reset_at TIMESTAMPTZ DEFAULT NOW()`;
 
   schemaReady = true;
 }
+
+// ── Company ────────────────────────────────────────────────────────────────
 
 export interface Company {
   id: number;
@@ -107,32 +110,43 @@ export interface Company {
   description: string;
   language: string;
   custom_searches: string;
+  user_id: string | null;
   created_at: string;
 }
 
-export async function getAllCompanies(): Promise<Company[]> {
+export async function getAllCompanies(userId: string): Promise<Company[]> {
   await ensureSchema();
   const sql = getDb();
-  const rows = await sql`SELECT * FROM companies ORDER BY created_at ASC`;
+  const rows = await sql`SELECT * FROM companies WHERE user_id = ${userId} ORDER BY created_at ASC`;
   return rows as Company[];
 }
 
-export async function getCompanyById(id: number): Promise<Company | undefined> {
+export async function getCompanyById(id: number, userId?: string): Promise<Company | undefined> {
   await ensureSchema();
   const sql = getDb();
-  const rows = await sql`SELECT * FROM companies WHERE id = ${id}`;
+  const rows = userId
+    ? await sql`SELECT * FROM companies WHERE id = ${id} AND user_id = ${userId}`
+    : await sql`SELECT * FROM companies WHERE id = ${id}`;
   return rows[0] as Company | undefined;
 }
 
+export async function countUserCompanies(userId: string): Promise<number> {
+  await ensureSchema();
+  const sql = getDb();
+  const rows = await sql`SELECT COUNT(*)::int AS count FROM companies WHERE user_id = ${userId}`;
+  return rows[0]?.count ?? 0;
+}
+
 export async function createCompany(
-  fields: Pick<Company, 'name' | 'tagline' | 'theme' | 'size' | 'category' | 'url' | 'description' | 'language'>
+  fields: Pick<Company, 'name' | 'tagline' | 'theme' | 'size' | 'category' | 'url' | 'description' | 'language'>,
+  userId: string,
 ): Promise<Company> {
   await ensureSchema();
   const sql = getDb();
   const rows = await sql`
-    INSERT INTO companies (name, tagline, theme, size, category, url, description, language)
+    INSERT INTO companies (name, tagline, theme, size, category, url, description, language, user_id)
     VALUES (${fields.name}, ${fields.tagline}, ${fields.theme}, ${fields.size},
-            ${fields.category}, ${fields.url}, ${fields.description}, ${fields.language})
+            ${fields.category}, ${fields.url}, ${fields.description}, ${fields.language}, ${userId})
     RETURNING *
   `;
   return rows[0] as Company;
@@ -140,10 +154,11 @@ export async function createCompany(
 
 export async function updateCompany(
   id: number,
-  fields: Partial<Pick<Company, 'name' | 'tagline' | 'theme' | 'size' | 'category' | 'url' | 'description' | 'language'>>
+  fields: Partial<Pick<Company, 'name' | 'tagline' | 'theme' | 'size' | 'category' | 'url' | 'description' | 'language'>>,
+  userId: string,
 ): Promise<Company | undefined> {
   await ensureSchema();
-  const current = await getCompanyById(id);
+  const current = await getCompanyById(id, userId);
   if (!current) return undefined;
   const m = { ...current, ...fields };
   const sql = getDb();
@@ -157,10 +172,104 @@ export async function updateCompany(
       url         = ${m.url},
       description = ${m.description},
       language    = ${m.language}
+    WHERE id = ${id} AND user_id = ${userId}
+  `;
+  return getCompanyById(id, userId);
+}
+
+// ── User profile ───────────────────────────────────────────────────────────
+
+export interface UserProfile {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  buffer_api_token: string | null;
+  plan: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  posts_this_month: number;
+  posts_reset_at: string | null;
+}
+
+export async function getUserById(id: string): Promise<UserProfile | null> {
+  await ensureSchema();
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM users WHERE id = ${id}`;
+  return (rows[0] as UserProfile) ?? null;
+}
+
+export async function updateUserBufferToken(id: string, token: string): Promise<void> {
+  await ensureSchema();
+  const sql = getDb();
+  await sql`UPDATE users SET buffer_api_token = ${token} WHERE id = ${id}`;
+}
+
+export async function updateUserPlan(
+  id: string,
+  plan: string,
+  stripeCustomerId?: string | null,
+  stripeSubscriptionId?: string | null,
+): Promise<void> {
+  await ensureSchema();
+  const sql = getDb();
+  await sql`
+    UPDATE users SET
+      plan                    = ${plan},
+      stripe_customer_id      = COALESCE(${stripeCustomerId ?? null}, stripe_customer_id),
+      stripe_subscription_id  = COALESCE(${stripeSubscriptionId ?? null}, stripe_subscription_id)
     WHERE id = ${id}
   `;
-  return getCompanyById(id);
 }
+
+export async function updateUserStripeCustomer(stripeCustomerId: string, plan: string, stripeSubscriptionId?: string | null): Promise<void> {
+  await ensureSchema();
+  const sql = getDb();
+  await sql`
+    UPDATE users SET
+      plan                    = ${plan},
+      stripe_subscription_id  = COALESCE(${stripeSubscriptionId ?? null}, stripe_subscription_id)
+    WHERE stripe_customer_id = ${stripeCustomerId}
+  `;
+}
+
+export async function getUserByStripeCustomer(stripeCustomerId: string): Promise<UserProfile | null> {
+  await ensureSchema();
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM users WHERE stripe_customer_id = ${stripeCustomerId}`;
+  return (rows[0] as UserProfile) ?? null;
+}
+
+export async function incrementUserPosts(id: string): Promise<{ count: number }> {
+  await ensureSchema();
+  const sql = getDb();
+  // Reset counter if we're in a new calendar month
+  await sql`
+    UPDATE users SET posts_this_month = 0, posts_reset_at = NOW()
+    WHERE id = ${id}
+      AND DATE_TRUNC('month', COALESCE(posts_reset_at, NOW())) < DATE_TRUNC('month', NOW())
+  `;
+  const rows = await sql`
+    UPDATE users SET posts_this_month = COALESCE(posts_this_month, 0) + 1
+    WHERE id = ${id}
+    RETURNING posts_this_month
+  `;
+  return { count: rows[0]?.posts_this_month ?? 1 };
+}
+
+export async function getUserPostCount(id: string): Promise<number> {
+  await ensureSchema();
+  const sql = getDb();
+  await sql`
+    UPDATE users SET posts_this_month = 0, posts_reset_at = NOW()
+    WHERE id = ${id}
+      AND DATE_TRUNC('month', COALESCE(posts_reset_at, NOW())) < DATE_TRUNC('month', NOW())
+  `;
+  const rows = await sql`SELECT COALESCE(posts_this_month, 0) AS posts_this_month FROM users WHERE id = ${id}`;
+  return rows[0]?.posts_this_month ?? 0;
+}
+
+// ── Search cache ───────────────────────────────────────────────────────────
 
 export async function getCachedSearch(query: string, maxAgeHours = 24): Promise<object[] | null> {
   await ensureSchema();
@@ -189,6 +298,8 @@ export async function clearSearchCache(): Promise<void> {
   await sql`DELETE FROM search_cache`;
 }
 
+// ── Company searches ───────────────────────────────────────────────────────
+
 export async function getCompanySearches(id: number): Promise<string[]> {
   await ensureSchema();
   const sql = getDb();
@@ -214,6 +325,8 @@ export async function removeCompanySearch(id: number, query: string): Promise<st
   await sql`UPDATE companies SET custom_searches = ${JSON.stringify(updated)} WHERE id = ${id}`;
   return updated;
 }
+
+// ── Generation logs / billing ──────────────────────────────────────────────
 
 export async function logGeneration(
   type: string,

@@ -54,7 +54,7 @@ export default function CompanyOnboarding() {
       });
       if (!res.ok) throw new Error('Failed to create company');
       const company = await res.json();
-      router.push(`/social/company/${company.id}`);
+      router.push(`/dashboard/company/${company.id}`);
     } catch {
       setError('Something went wrong. Please try again.');
       setSubmitting(false);
@@ -66,7 +66,7 @@ export default function CompanyOnboarding() {
       {/* Back link */}
       <div className="w-full max-w-xl mb-6">
         <button
-          onClick={() => router.push('/social')}
+          onClick={() => router.push('/dashboard')}
           className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

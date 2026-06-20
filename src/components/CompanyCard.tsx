@@ -8,6 +8,7 @@ interface CompanyCardProps {
   name: string;
   tagline: string;
   theme: string;
+  basePath?: string;
 }
 
 function getInitials(name: string): string {
@@ -19,12 +20,12 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-export default function CompanyCard({ id, name, tagline, theme }: CompanyCardProps) {
+export default function CompanyCard({ id, name, tagline, theme, basePath = '/dashboard' }: CompanyCardProps) {
   const themeKey = (theme in THEMES ? theme : 'indigo') as ThemeKey;
   const themeConfig = THEMES[themeKey];
 
   return (
-    <Link href={`/social/company/${id}`} className="block">
+    <Link href={`${basePath}/company/${id}`} className="block">
       <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden cursor-pointer">
         {/* Coloured top banner */}
         <div

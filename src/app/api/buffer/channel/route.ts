@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { getUserById } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-let cachedChannels: { id: string; name: string; service: string }[] | null = null;
+const channelCache = new Map<string, { id: string; name: string; service: string }[]>();
 
 async function fetchChannels(headers: Record<string, string>, orgId: string) {
   // Try with service field first; fall back to id+name only if schema doesn't support it
@@ -24,14 +26,20 @@ async function fetchChannels(headers: Record<string, string>, orgId: string) {
 }
 
 export async function GET() {
-  try {
-    if (cachedChannels) {
-      return NextResponse.json({ channels: cachedChannels });
-    }
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const token = process.env.BUFFER_API_TOKEN;
+  try {
+    const cached = channelCache.get(session.user.id);
+    if (cached) return NextResponse.json({ channels: cached });
+
+    const user = await getUserById(session.user.id);
+    const token = user?.buffer_api_token || process.env.BUFFER_API_TOKEN;
     if (!token) {
-      return NextResponse.json({ error: 'BUFFER_API_TOKEN not configured' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'No Buffer API token. Add yours in Settings.' },
+        { status: 400 }
+      );
     }
 
     const headers = {
@@ -39,7 +47,6 @@ export async function GET() {
       'Content-Type': 'application/json',
     };
 
-    // Step 1: Get organization ID
     const orgRes = await fetch('https://api.buffer.com/rpc', {
       method: 'POST',
       headers,
@@ -50,17 +57,17 @@ export async function GET() {
     const orgId = orgData?.data?.account?.organizations?.[0]?.id;
     if (!orgId) throw new Error('No organization found in Buffer account');
 
-    // Step 2: Get all channels
     const channels = await fetchChannels(headers, orgId);
     if (!channels) throw new Error('No channels found in Buffer account');
 
-    cachedChannels = channels.map((c: { id: string; name: string; service?: string }) => ({
+    const result = channels.map((c: { id: string; name: string; service?: string }) => ({
       id: c.id,
       name: c.name,
       service: c.service ?? 'unknown',
     }));
 
-    return NextResponse.json({ channels: cachedChannels });
+    channelCache.set(session.user.id, result);
+    return NextResponse.json({ channels: result });
   } catch (err) {
     console.error('GET /api/buffer/channel error:', err);
     return NextResponse.json(

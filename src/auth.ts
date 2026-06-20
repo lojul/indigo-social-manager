@@ -7,10 +7,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: NeonAdapter(),
   session: { strategy: 'jwt' },
   callbacks: {
-    signIn({ profile }) {
-      const allowed = process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim()) ?? []
-      return allowed.length === 0 || allowed.includes(profile?.email ?? '')
-    },
     jwt({ token, user }) {
       if (user) token.id = user.id
       return token

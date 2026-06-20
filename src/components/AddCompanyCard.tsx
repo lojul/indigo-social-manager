@@ -1,9 +1,9 @@
 import Link from 'next/link';
 
-export default function AddCompanyCard() {
+export default function AddCompanyCard({ basePath = '/dashboard' }: { basePath?: string }) {
   return (
     <Link
-      href="/social/company/new"
+      href={`${basePath}/company/new`}
       className="bg-white rounded-xl border-2 border-dashed border-gray-300 hover:border-indigo-400 hover:bg-indigo-50 transition-all duration-200 flex flex-col items-center justify-center min-h-[140px] group"
     >
       <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-indigo-100 flex items-center justify-center mb-3 transition-colors">
@@ -17,7 +17,7 @@ export default function AddCompanyCard() {
         </svg>
       </div>
       <span className="text-sm font-medium text-gray-500 group-hover:text-indigo-600 transition-colors">
-        Add Company
+        Add Workspace
       </span>
     </Link>
   );

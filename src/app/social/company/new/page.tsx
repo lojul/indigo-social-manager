@@ -1,7 +1,5 @@
-import CompanyOnboarding from '@/components/CompanyOnboarding';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'New Company – Admin' };
-
-export default function NewCompanyPage() {
-  return <CompanyOnboarding />;
+export default function LegacyNewPage() {
+  redirect('/dashboard/company/new');
 }

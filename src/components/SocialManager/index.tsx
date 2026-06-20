@@ -44,7 +44,7 @@ export default function SocialManager({ company }: { company: Company }) {
   const initials = company.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
   function goToStep(s: Step) {
-    router.push(`/social/company/${company.id}?step=${s}`);
+    router.push(`/dashboard/company/${company.id}?step=${s}`);
   }
 
   function canGoNext(): boolean {
@@ -55,7 +55,7 @@ export default function SocialManager({ company }: { company: Company }) {
 
   function handleBack() {
     if (stepIndex === 0) {
-      router.push('/social');
+      router.push('/dashboard');
     } else {
       goToStep(STEPS[stepIndex - 1]);
     }
@@ -66,7 +66,7 @@ export default function SocialManager({ company }: { company: Company }) {
     setPostText('');
     setPublished(false);
     setResetKey(k => k + 1);
-    router.push(`/social/company/${company.id}`);
+    router.push(`/dashboard/company/${company.id}`);
   }
 
   if (published) {
@@ -95,7 +95,7 @@ export default function SocialManager({ company }: { company: Company }) {
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm min-w-0">
-            <Link href="/social" className="text-gray-400 hover:text-gray-600 transition-colors shrink-0">
+            <Link href="/dashboard" className="text-gray-400 hover:text-gray-600 transition-colors shrink-0">
               Companies
             </Link>
             <span className="text-gray-200 shrink-0">/</span>
@@ -110,7 +110,7 @@ export default function SocialManager({ company }: { company: Company }) {
             </div>
           </div>
           <Link
-            href={`/social/company/${company.id}/settings`}
+            href={`/dashboard/company/${company.id}/settings`}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors shrink-0"
           >
             Settings

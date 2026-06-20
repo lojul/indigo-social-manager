@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/auth';
 import { getCompanyById, updateCompany } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -7,13 +8,13 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
-
-    const company = await getCompanyById(id);
+    const company = await getCompanyById(id, session.user.id);
     if (!company) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
     return NextResponse.json(company);
   } catch (err) {
     console.error('GET /api/companies/[id]:', err);
@@ -25,26 +26,20 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
-
     const body = await req.json();
     const allowed = ['name', 'tagline', 'theme', 'size', 'category', 'url', 'description', 'language'] as const;
     const fields: Record<string, string> = {};
     for (const key of allowed) {
-      if (key in body && typeof body[key] === 'string') {
-        fields[key] = body[key].trim();
-      }
+      if (key in body && typeof body[key] === 'string') fields[key] = body[key].trim();
     }
-
-    if (fields.name === '') {
-      return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
-    }
-
-    const updated = await updateCompany(id, fields);
+    if (fields.name === '') return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
+    const updated = await updateCompany(id, fields, session.user.id);
     if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
     return NextResponse.json(updated);
   } catch (err) {
     console.error('PATCH /api/companies/[id]:', err);

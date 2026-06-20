@@ -7,8 +7,14 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl
-      if (pathname.startsWith('/api/auth') || pathname === '/login') return true
-return !!auth?.user
+      // Public routes
+      if (
+        pathname === '/' ||
+        pathname === '/pricing' ||
+        pathname === '/login' ||
+        pathname.startsWith('/api/auth')
+      ) return true
+      return !!auth?.user
     },
   },
 } satisfies NextAuthConfig
