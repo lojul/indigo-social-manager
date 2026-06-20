@@ -109,12 +109,20 @@ export default function SocialManager({ company }: { company: Company }) {
               <span className="font-medium text-gray-700 truncate">{company.name}</span>
             </div>
           </div>
-          <Link
-            href={`/dashboard/company/${company.id}/settings`}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors shrink-0"
-          >
-            Settings
-          </Link>
+          <div className="flex items-center gap-3 shrink-0">
+            <Link
+              href="/billing"
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Billing
+            </Link>
+            <Link
+              href={`/dashboard/company/${company.id}/settings`}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Settings
+            </Link>
+          </div>
         </div>
       </div>
 
