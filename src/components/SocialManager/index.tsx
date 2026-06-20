@@ -93,25 +93,25 @@ export default function SocialManager({ company }: { company: Company }) {
     <div className="flex flex-col min-h-[calc(100vh-3rem)]">
       {/* Breadcrumb / context bar */}
       <div className="bg-white border-b border-gray-100">
-        <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <Link href="/social" className="text-gray-400 hover:text-gray-600 transition-colors">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm min-w-0">
+            <Link href="/social" className="text-gray-400 hover:text-gray-600 transition-colors shrink-0">
               Companies
             </Link>
-            <span className="text-gray-200">/</span>
-            <div className="flex items-center gap-1.5">
+            <span className="text-gray-200 shrink-0">/</span>
+            <div className="flex items-center gap-1.5 min-w-0">
               <div
-                className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold"
+                className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
                 style={{ backgroundColor: theme.bg }}
               >
                 {initials}
               </div>
-              <span className="font-medium text-gray-700">{company.name}</span>
+              <span className="font-medium text-gray-700 truncate">{company.name}</span>
             </div>
           </div>
           <Link
             href={`/social/company/${company.id}/settings`}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors shrink-0"
           >
             Settings
           </Link>
@@ -120,7 +120,7 @@ export default function SocialManager({ company }: { company: Company }) {
 
       {/* Progress bar */}
       <div className="bg-white border-b border-gray-100">
-        <div className="max-w-3xl mx-auto px-6 py-4">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
               Step {stepIndex + 1} of {STEPS.length}
@@ -141,7 +141,7 @@ export default function SocialManager({ company }: { company: Company }) {
       </div>
 
       {/* Step content */}
-      <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-8">
+      <div className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
         {step === 'search' && (
           <SearchStep
             key={resetKey}
@@ -179,7 +179,7 @@ export default function SocialManager({ company }: { company: Company }) {
       </div>
 
       {/* Bottom navigation */}
-      <div className="bg-white border-t border-gray-100 px-6 py-4">
+      <div className="bg-white border-t border-gray-100 px-4 sm:px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <button
             onClick={handleBack}

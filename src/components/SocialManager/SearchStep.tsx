@@ -144,7 +144,12 @@ export default function SearchStep({ onTopicSelect, companyCategory, companyId }
       });
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
-      setTopics(data.results || []);
+      const sorted = (data.results || []).slice().sort((a: Topic, b: Topic) => {
+        if (!a.publishedDate) return 1;
+        if (!b.publishedDate) return -1;
+        return new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime();
+      });
+      setTopics(sorted);
     } catch {
       setError('Failed to search topics. Check your Tavily API key.');
     } finally {

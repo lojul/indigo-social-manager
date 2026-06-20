@@ -1,13 +1,10 @@
 import NextAuth from 'next-auth'
-import PostgresAdapter from '@auth/pg-adapter'
-import { Pool } from 'pg'
+import { NeonAdapter } from './lib/authAdapter'
 import { authConfig } from './auth.config'
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  adapter: PostgresAdapter(pool),
+  adapter: NeonAdapter(),
   session: { strategy: 'jwt' },
   callbacks: {
     signIn({ profile }) {

@@ -41,12 +41,23 @@ async function callOpenRouter(instruction: string, apiKey: string, maxTokens: nu
   throw new Error(`OpenRouter call failed: ${lastError}`);
 }
 
+const STYLE_DESCRIPTORS: Record<string, string> = {
+  'photorealistic':  'photorealistic cinematic scene, professional photography, dark bottom third, corporate aesthetic',
+  'illustration':    'flat vector illustration, vibrant bold colors, clean geometric shapes, modern design',
+  'abstract':        'abstract geometric shapes, gradient color fields, modern art, dynamic composition',
+  'minimalist':      'clean minimalist design, simple composition, neutral background, ample white space, elegant',
+  'dark-cinematic':  'dark dramatic cinematic lighting, moody atmosphere, high contrast, deep shadows, film noir',
+  'neon-tech':       'neon-lit futuristic tech scene, dark background, glowing neon accents, cyberpunk aesthetic',
+};
+
 async function generatePrompt(
   title: string,
   summary: string,
   companyCategory: string,
+  imageStyle: string,
   apiKey: string
 ): Promise<string> {
+  const styleDesc = STYLE_DESCRIPTORS[imageStyle] || STYLE_DESCRIPTORS['photorealistic'];
   // Single call: scene + text overlay design in one JSON response
   const raw = await callOpenRouter(
     `You are an expert AI image prompt engineer and social media designer.
@@ -56,9 +67,10 @@ Generate an image prompt and text overlay for a professional business social med
 Topic: ${title}
 Summary: ${summary}
 Industry: ${companyCategory || 'business'}
+Visual style: ${styleDesc}
 
 Return ONLY this JSON (no markdown, no explanation):
-{"scene":"<max 30-word photorealistic cinematic scene, dark bottom third, corporate aesthetic>","headline":"<max 6 words>","subtext":"<3-5 words or empty string>","placement":"bottom-left","style":"bold white"}`,
+{"scene":"<max 30-word scene matching the visual style, dark bottom third, suitable for text overlay>","headline":"<max 6 words>","subtext":"<3-5 words or empty string>","placement":"bottom-left","style":"bold white"}`,
     apiKey,
     180,
   );
@@ -78,7 +90,7 @@ Return ONLY this JSON (no markdown, no explanation):
     scene = raw.slice(0, 200);
   }
 
-  if (!scene) scene = `Professional ${companyCategory || 'business'} scene representing ${title}, cinematic lighting, dark lower third`;
+  if (!scene) scene = `Professional ${companyCategory || 'business'} scene representing ${title}, ${styleDesc}, dark lower third`;
 
   const overlay = [
     `Text overlay at bottom-left: headline "${headline}"`,
@@ -116,7 +128,7 @@ async function generateImageBase64(prompt: string, azureKey: string, azureEndpoi
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, summary, companyCategory, companyId, width = 1080, height = 1080 } = await req.json();
+    const { title, summary, companyCategory, companyId, width = 1080, height = 1080, imageStyle = 'photorealistic' } = await req.json();
 
     if (!title) return NextResponse.json({ error: 'title is required' }, { status: 400 });
 
@@ -131,7 +143,7 @@ export async function POST(req: NextRequest) {
     if (!azureKey || !azureEndpoint) return NextResponse.json({ error: 'Azure OpenAI image env vars not configured' }, { status: 500 });
 
     // Step 1: Generate scene + AI-designed text overlay prompt
-    const fullPrompt = await generatePrompt(title, summary || '', companyCategory || '', apiKey);
+    const fullPrompt = await generatePrompt(title, summary || '', companyCategory || '', imageStyle, apiKey);
 
     // Step 2: Generate image via Azure OpenAI
     const base64 = await generateImageBase64(fullPrompt, azureKey, azureEndpoint);

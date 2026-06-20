@@ -100,7 +100,7 @@ export default function WriteStep({
         <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs font-medium text-blue-700 mb-1">Selected Topic</p>
           <p className="text-xs text-blue-600 mb-2 line-clamp-2">{selectedTopic.title}</p>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={useDraft}
               className="text-xs px-3 py-1.5 border border-blue-300 text-blue-700 rounded-md hover:bg-blue-100 transition-colors"
@@ -130,11 +130,11 @@ export default function WriteStep({
         value={postText}
         onChange={(e) => onPostTextChange(e.target.value)}
         placeholder="Select a topic and click Generate with AI, or write your post here…"
-        rows={10}
+        rows={8}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
       />
 
-      <div className="flex items-center justify-between mt-1.5">
+      <div className="flex items-center justify-between mt-1.5 gap-2">
         <div className="flex gap-2">
           <button
             onClick={() => handleTranslate('zh-TW')}

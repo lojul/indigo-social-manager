@@ -24,7 +24,7 @@ export default function Navbar({ user }: { user: User }) {
   }, []);
 
   return (
-    <nav className="h-12 bg-white border-b border-gray-100 px-6 flex items-center justify-between sticky top-0 z-40">
+    <nav className="h-12 bg-white border-b border-gray-100 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
       <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
         <div className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center">
           <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -131,6 +131,7 @@ export default function DesignStep({
   const [aiPrompt, setAiPrompt] = useState('');
   const [generatingAI, setGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [imageStyle, setImageStyle] = useState('photorealistic');
 
   // Text card state
   const [canvasDataUrl, setCanvasDataUrl] = useState('');
@@ -195,6 +196,7 @@ export default function DesignStep({
           summary: selectedTopicSummary || postText.slice(0, 300),
           companyName, companyCategory, companyId,
           width: size.width, height: size.height,
+          imageStyle,
         }),
       });
       const data = await res.json();
@@ -467,6 +469,18 @@ export default function DesignStep({
         {/* ── AI Image mode ── */}
         {mode === 'ai' && (
           <>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Image Style</label>
+              <select value={imageStyle} onChange={e => setImageStyle(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="photorealistic">Photorealistic</option>
+                <option value="illustration">Flat Illustration</option>
+                <option value="abstract">Abstract / Geometric</option>
+                <option value="minimalist">Minimalist / Clean</option>
+                <option value="dark-cinematic">Dark &amp; Cinematic</option>
+                <option value="neon-tech">Neon / Futuristic Tech</option>
+              </select>
+            </div>
             <button onClick={handleGenerateAI} disabled={generatingAI || !canGenerate}
               className="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
               {generatingAI

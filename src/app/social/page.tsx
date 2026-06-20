@@ -7,10 +7,10 @@ export const dynamic = 'force-dynamic';
 export default async function SocialPage() {
   const companies = await getAllCompanies();
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Social Media Manager</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Social Media Manager</h1>
           <p className="text-sm text-gray-500 mt-1">Select a company workspace to create posts.</p>
         </div>
         <Link
