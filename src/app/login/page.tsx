@@ -3,34 +3,32 @@
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import Link from 'next/link';
+import { Sparkles } from 'lucide-react';
 
 function LoginContent() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-background font-body flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center mb-4">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Indigo Admin</h1>
-          <p className="text-sm text-gray-500 mt-1">Internal tools portal</p>
+          <Link href="/" className="font-heading text-2xl font-semibold tracking-tight text-deep-purple mb-1">
+            Soshio
+          </Link>
+          <p className="text-sm text-muted-foreground">Sign in to your account</p>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-          <h2 className="text-base font-semibold text-gray-900 mb-1">Sign in</h2>
-          <p className="text-sm text-gray-500 mb-6">Use your authorised Google account to continue.</p>
+        <div className="bg-card rounded-[24px] ring-1 ring-black/5 shadow-sm p-8">
+          <h2 className="font-heading text-lg font-medium text-foreground mb-1">Welcome back</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Continue with your Google account to get started.
+          </p>
 
           <button
             onClick={() => signIn('google', { callbackUrl })}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted transition-all shadow-sm"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -40,10 +38,20 @@ function LoginContent() {
             </svg>
             Continue with Google
           </button>
+
+          <div className="mt-6 pt-5 border-t border-border flex items-center justify-center gap-1.5">
+            <Sparkles className="size-3 text-coral-mid" />
+            <span className="text-xs text-muted-foreground">
+              Free to start — no credit card required
+            </span>
+          </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
-          Only authorised accounts can sign in.
+        <p className="text-center text-xs text-muted-foreground mt-6">
+          By continuing, you agree to our{' '}
+          <Link href="/" className="text-coral-mid hover:underline">Terms</Link>
+          {' '}and{' '}
+          <Link href="/" className="text-coral-mid hover:underline">Privacy Policy</Link>.
         </p>
       </div>
     </div>
