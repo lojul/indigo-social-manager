@@ -9,7 +9,7 @@ export const authConfig = {
       const { pathname } = request.nextUrl
       // Public routes
       if (
-        pathname === '/' ||
+        pathname === '/soshio' ||
         pathname === '/pricing' ||
         pathname === '/login' ||
         pathname.startsWith('/api/auth')
