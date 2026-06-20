@@ -114,10 +114,10 @@ export interface Company {
   created_at: string;
 }
 
-export async function getAllCompanies(userId: string): Promise<Company[]> {
+export async function getAllCompanies(): Promise<Company[]> {
   await ensureSchema();
   const sql = getDb();
-  const rows = await sql`SELECT * FROM companies WHERE user_id = ${userId} ORDER BY created_at ASC`;
+  const rows = await sql`SELECT * FROM companies ORDER BY created_at ASC`;
   return rows as Company[];
 }
 
@@ -139,14 +139,13 @@ export async function countUserCompanies(userId: string): Promise<number> {
 
 export async function createCompany(
   fields: Pick<Company, 'name' | 'tagline' | 'theme' | 'size' | 'category' | 'url' | 'description' | 'language'>,
-  userId: string,
 ): Promise<Company> {
   await ensureSchema();
   const sql = getDb();
   const rows = await sql`
-    INSERT INTO companies (name, tagline, theme, size, category, url, description, language, user_id)
+    INSERT INTO companies (name, tagline, theme, size, category, url, description, language)
     VALUES (${fields.name}, ${fields.tagline}, ${fields.theme}, ${fields.size},
-            ${fields.category}, ${fields.url}, ${fields.description}, ${fields.language}, ${userId})
+            ${fields.category}, ${fields.url}, ${fields.description}, ${fields.language})
     RETURNING *
   `;
   return rows[0] as Company;
@@ -155,10 +154,9 @@ export async function createCompany(
 export async function updateCompany(
   id: number,
   fields: Partial<Pick<Company, 'name' | 'tagline' | 'theme' | 'size' | 'category' | 'url' | 'description' | 'language'>>,
-  userId: string,
 ): Promise<Company | undefined> {
   await ensureSchema();
-  const current = await getCompanyById(id, userId);
+  const current = await getCompanyById(id);
   if (!current) return undefined;
   const m = { ...current, ...fields };
   const sql = getDb();
@@ -172,9 +170,9 @@ export async function updateCompany(
       url         = ${m.url},
       description = ${m.description},
       language    = ${m.language}
-    WHERE id = ${id} AND user_id = ${userId}
+    WHERE id = ${id}
   `;
-  return getCompanyById(id, userId);
+  return getCompanyById(id);
 }
 
 // ── User profile ───────────────────────────────────────────────────────────

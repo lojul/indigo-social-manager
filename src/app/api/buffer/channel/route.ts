@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import { getUserById } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-const channelCache = new Map<string, { id: string; name: string; service: string }[]>();
+let channelCache: { id: string; name: string; service: string }[] | null = null;
 
 async function fetchChannels(headers: Record<string, string>, orgId: string) {
-  // Try with service field first; fall back to id+name only if schema doesn't support it
   for (const query of [
     `{ channels(input: { organizationId: "${orgId}" }) { id name service } }`,
     `{ channels(input: { organizationId: "${orgId}" }) { id name } }`,
@@ -26,18 +23,13 @@ async function fetchChannels(headers: Record<string, string>, orgId: string) {
 }
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   try {
-    const cached = channelCache.get(session.user.id);
-    if (cached) return NextResponse.json({ channels: cached });
+    if (channelCache) return NextResponse.json({ channels: channelCache });
 
-    const user = await getUserById(session.user.id);
-    const token = user?.buffer_api_token || process.env.BUFFER_API_TOKEN;
+    const token = process.env.BUFFER_API_TOKEN;
     if (!token) {
       return NextResponse.json(
-        { error: 'No Buffer API token. Add yours in Settings.' },
+        { error: 'BUFFER_API_TOKEN not configured.' },
         { status: 400 }
       );
     }
@@ -66,7 +58,7 @@ export async function GET() {
       service: c.service ?? 'unknown',
     }));
 
-    channelCache.set(session.user.id, result);
+    channelCache = result;
     return NextResponse.json({ channels: result });
   } catch (err) {
     console.error('GET /api/buffer/channel error:', err);

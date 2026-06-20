@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { auth } from '@/auth';
 import { getCompanyById } from '@/lib/db';
 import { THEMES, ThemeKey } from '@/lib/themes';
 import CompanySettingsForm from '@/components/CompanySettingsForm';
@@ -12,13 +11,10 @@ interface Props {
 }
 
 export default async function DashboardCompanySettingsPage({ params }: Props) {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-
   const id = parseInt(params.id, 10);
   if (isNaN(id)) notFound();
 
-  const company = await getCompanyById(id, session.user.id);
+  const company = await getCompanyById(id);
   if (!company) notFound();
 
   const themeKey = (company.theme in THEMES ? company.theme : 'indigo') as ThemeKey;

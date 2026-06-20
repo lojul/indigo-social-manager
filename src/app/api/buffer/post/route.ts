@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import { getUserById, incrementUserPosts, getUserPostCount } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,12 +70,7 @@ async function postToChannel(
   return { channelId, service, success: true };
 }
 
-const FREE_POST_LIMIT = 5;
-
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   try {
     const { channelIds, text, imageUrl, videoUrl } = await req.json();
 
@@ -85,25 +78,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'channelIds is required' }, { status: 400 });
     }
 
-    const user = await getUserById(session.user.id);
-    const plan = user?.plan ?? 'free';
-
-    if (plan === 'free') {
-      const count = await getUserPostCount(session.user.id);
-      if (count >= FREE_POST_LIMIT) {
-        return NextResponse.json(
-          { error: `Free plan allows ${FREE_POST_LIMIT} posts/month. Upgrade to Pro for unlimited.`, upgrade: true },
-          { status: 403 },
-        );
-      }
-    }
-
-    const token = user?.buffer_api_token || process.env.BUFFER_API_TOKEN;
+    const token = process.env.BUFFER_API_TOKEN;
     if (!token) {
-      return NextResponse.json({ error: 'No Buffer API token. Add yours in Settings.' }, { status: 400 });
+      return NextResponse.json({ error: 'BUFFER_API_TOKEN not configured.' }, { status: 400 });
     }
 
-    // Post to all channels in parallel (filter out any malformed entries)
     const validChannels = channelIds.filter((c: { id?: string }) => c?.id);
     if (validChannels.length === 0) {
       return NextResponse.json({ error: 'No valid channel IDs provided' }, { status: 400 });
@@ -123,8 +102,6 @@ export async function POST(req: NextRequest) {
     if (succeeded === 0) {
       throw new Error(`All posts failed: ${errors.join('; ')}`);
     }
-
-    if (succeeded > 0) await incrementUserPosts(session.user.id);
 
     return NextResponse.json({
       success: true,

@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation';
-import { auth } from '@/auth';
 import { getCompanyById } from '@/lib/db';
 import SocialManager from '@/components/SocialManager';
 
@@ -10,13 +9,10 @@ interface Props {
 }
 
 export default async function DashboardCompanyPage({ params }: Props) {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-
   const id = parseInt(params.id, 10);
   if (isNaN(id)) notFound();
 
-  const company = await getCompanyById(id, session.user.id);
+  const company = await getCompanyById(id);
   if (!company) notFound();
 
   return <SocialManager company={company} />;

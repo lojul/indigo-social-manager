@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
 import { getCompanyById, updateCompany } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -8,12 +7,10 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
-    const company = await getCompanyById(id, session.user.id);
+    const company = await getCompanyById(id);
     if (!company) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json(company);
   } catch (err) {
@@ -26,8 +23,6 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
@@ -38,7 +33,7 @@ export async function PATCH(
       if (key in body && typeof body[key] === 'string') fields[key] = body[key].trim();
     }
     if (fields.name === '') return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
-    const updated = await updateCompany(id, fields, session.user.id);
+    const updated = await updateCompany(id, fields);
     if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json(updated);
   } catch (err) {
