@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Check, Sparkles } from 'lucide-react';
 
 export const metadata = { title: 'Pricing – Soshio' };
 
@@ -22,94 +23,102 @@ const PRO_FEATURES = [
 
 export default function PricingPage() {
   return (
-    <div className="min-h-screen bg-white">
-      {/* Nav */}
-      <nav className="h-14 border-b border-gray-100 px-4 sm:px-8 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+    <div className="min-h-screen bg-background font-body text-foreground">
+      <nav className="fixed top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+          <div className="flex items-center gap-8">
+            <Link href="/" className="font-heading text-xl font-semibold tracking-tight text-deep-purple">
+              Soshio
+            </Link>
+            <div className="hidden gap-6 sm:flex">
+              <Link href="/#features" className="text-sm font-medium text-muted-foreground transition-colors hover:text-coral-mid">
+                Features
+              </Link>
+              <Link href="/pricing" className="text-sm font-medium text-coral-mid">
+                Pricing
+              </Link>
+            </div>
           </div>
-          <span className="text-sm font-bold text-gray-900">Soshio</span>
-        </Link>
-        <Link
-          href="/login"
-          className="text-sm font-medium px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          Sign in
-        </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/login" className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline">
+              Sign in
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 rounded-full bg-deep-purple py-2 pr-4 pl-3 text-sm font-medium text-white shadow-sm transition-transform hover:scale-[1.02]"
+            >
+              <Sparkles className="size-4 shrink-0" />
+              Get started free
+            </Link>
+          </div>
+        </div>
       </nav>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Simple, transparent pricing</h1>
-          <p className="text-gray-500 text-lg">Start free. Upgrade when your business grows.</p>
+      <div className="mx-auto max-w-4xl px-6 pt-32 pb-24">
+        <div className="mb-16 text-center">
+          <span className="text-xs font-semibold tracking-widest text-coral-mid uppercase">Pricing</span>
+          <h1 className="mt-3 font-heading text-4xl font-medium tracking-tight md:text-5xl">
+            Simple pricing for growing creators
+          </h1>
+          <p className="mt-4 text-muted-foreground">
+            Start for free and scale as your audience grows. No hidden fees.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
-          {/* Free */}
-          <div className="border border-gray-200 rounded-2xl p-7">
-            <div className="mb-6">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Free</p>
-              <div className="flex items-end gap-1 mb-1">
-                <span className="text-4xl font-bold text-gray-900">$0</span>
-              </div>
-              <p className="text-sm text-gray-400">Forever free — no credit card needed</p>
+        <div className="mx-auto grid max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2">
+          <div className="rounded-[24px] bg-card p-8 ring-1 ring-black/5">
+            <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">Free</span>
+            <div className="mt-4 flex items-baseline gap-1">
+              <span className="font-heading text-5xl font-medium tracking-tight">$0</span>
+              <span className="text-sm text-muted-foreground">/mo</span>
             </div>
-            <ul className="space-y-3 mb-7">
+            <p className="mt-2 text-sm text-muted-foreground">Forever free — no credit card needed</p>
+            <ul className="mt-8 space-y-4 text-sm text-muted-foreground">
               {FREE_FEATURES.map((f) => (
-                <li key={f} className="flex items-center gap-2.5 text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
+                <li key={f} className="flex items-center gap-2">
+                  <Check className="size-4 text-muted-foreground/50" />
                   {f}
                 </li>
               ))}
             </ul>
             <Link
               href="/login"
-              className="block w-full py-2.5 text-center border border-gray-200 text-sm font-semibold text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+              className="mt-10 block w-full rounded-full bg-muted py-2.5 text-center text-sm font-medium ring-1 ring-black/5 transition-colors hover:bg-muted/70"
             >
               Get started free
             </Link>
           </div>
 
-          {/* Pro */}
-          <div className="border-2 border-indigo-600 rounded-2xl p-7 relative">
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-              <span className="text-xs font-bold text-white bg-indigo-600 px-3 py-1 rounded-full">Most popular</span>
+          <div className="relative rounded-[24px] bg-coral-mid p-8 text-white shadow-2xl">
+            <div className="absolute -top-3 right-8 rounded-full bg-deep-purple px-3 py-1 text-[10px] font-semibold tracking-wider uppercase">
+              Most popular
             </div>
-            <div className="mb-6">
-              <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-2">Pro</p>
-              <div className="flex items-end gap-1 mb-1">
-                <span className="text-4xl font-bold text-gray-900">$29</span>
-                <span className="text-sm text-gray-400 mb-1">/month</span>
-              </div>
-              <p className="text-sm text-gray-400">Cancel anytime</p>
+            <span className="text-xs font-semibold tracking-widest text-white/70 uppercase">Pro</span>
+            <div className="mt-4 flex items-baseline gap-1">
+              <span className="font-heading text-5xl font-medium tracking-tight">$29</span>
+              <span className="text-sm text-white/70">/mo</span>
             </div>
-            <ul className="space-y-3 mb-7">
+            <p className="mt-2 text-sm text-white/70">Cancel anytime</p>
+            <ul className="mt-8 space-y-4 text-sm">
               {PRO_FEATURES.map((f) => (
-                <li key={f} className="flex items-center gap-2.5 text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
+                <li key={f} className="flex items-center gap-2">
+                  <Check className="size-4" />
                   {f}
                 </li>
               ))}
             </ul>
             <Link
               href="/login"
-              className="block w-full py-2.5 text-center bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors"
+              className="mt-10 block w-full rounded-full bg-white py-2.5 text-center text-sm font-medium text-coral-mid shadow-xl transition-transform active:scale-95"
             >
               Start free trial
             </Link>
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-8">
-          All plans include access to Buffer scheduling and Tavily trend search.{' '}
-          <Link href="/" className="text-indigo-600 hover:underline">Learn more →</Link>
+        <p className="mt-10 text-center text-xs text-muted-foreground">
+          All plans include Buffer scheduling and Tavily trend search.{' '}
+          <Link href="/" className="text-coral-mid hover:underline">Back to home →</Link>
         </p>
       </div>
     </div>

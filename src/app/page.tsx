@@ -1,220 +1,395 @@
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
+import { auth } from '@/auth';
+import {
+  ArrowRight,
+  Check,
+  Sparkles,
+  Layers,
+  Wand2,
+  CalendarClock,
+  TrendingUp,
+  Languages,
+  Film,
+} from 'lucide-react';
 
-const FEATURES = [
-  {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-      </svg>
-    ),
-    title: 'Multi-workspace',
-    description: 'Manage social media for multiple clients or brands from one dashboard.',
-  },
-  {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-      </svg>
-    ),
-    title: 'AI-powered content',
-    description: 'Generate post copy, images, and reels with AI — tailored to your brand voice.',
-  },
-  {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-      </svg>
-    ),
-    title: 'Buffer scheduling',
-    description: 'Posts go straight to your Buffer queue — publish to Facebook and Instagram automatically.',
-  },
-  {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
-      </svg>
-    ),
-    title: 'Trend-aware topics',
-    description: 'Search live news and industry trends to find the right topic before you write.',
-  },
-  {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-      </svg>
-    ),
-    title: 'Multilingual',
-    description: 'Write in English, then translate to Traditional or Simplified Chinese in one click.',
-  },
-  {
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-      </svg>
-    ),
-    title: 'AI video reels',
-    description: 'Turn your AI images into short cinematic reels — ready for Instagram and Facebook.',
-  },
-];
+export const metadata = {
+  title: 'Soshio — Social media posting, made effortless',
+  description:
+    'Generate AI posts, images, and reels for your clients and schedule them straight to Buffer for Instagram and Facebook.',
+};
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const session = await auth();
+  if (session?.user) redirect('/dashboard');
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Nav */}
-      <nav className="h-14 border-b border-gray-100 px-4 sm:px-8 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+    <div className="min-h-screen bg-background font-body text-foreground">
+      <Nav />
+      <Hero />
+      <Features />
+      <Pricing />
+      <FinalCTA />
+      <Footer />
+    </div>
+  );
+}
+
+function Nav() {
+  return (
+    <nav className="fixed top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        <div className="flex items-center gap-8">
+          <Link href="/" className="font-heading text-xl font-semibold tracking-tight text-deep-purple">
+            Soshio
+          </Link>
+          <div className="hidden gap-6 sm:flex">
+            <a href="#features" className="text-sm font-medium text-muted-foreground transition-colors hover:text-coral-mid">
+              Features
+            </a>
+            <a href="#pricing" className="text-sm font-medium text-muted-foreground transition-colors hover:text-coral-mid">
+              Pricing
+            </a>
           </div>
-          <span className="text-sm font-bold text-gray-900">Soshio</span>
-        </Link>
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Link href="/pricing" className="text-sm text-gray-500 hover:text-gray-900 transition-colors hidden sm:block">
-            Pricing
+        </div>
+        <div className="flex items-center gap-4">
+          <Link href="/login" className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline">
+            Sign in
           </Link>
           <Link
             href="/login"
-            className="text-sm font-medium px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full bg-deep-purple py-2 pr-4 pl-3 text-sm font-medium text-white shadow-sm transition-transform hover:scale-[1.02]"
           >
-            Sign in
+            <Sparkles className="size-4 shrink-0" />
+            Get started free
           </Link>
         </div>
-      </nav>
+      </div>
+    </nav>
+  );
+}
 
-      {/* Hero */}
-      <section className="pt-20 pb-16 sm:pt-28 sm:pb-24 px-4 sm:px-6 text-center">
-        <div className="max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium mb-6 border border-indigo-100">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Powered by AI
+function Hero() {
+  return (
+    <section className="relative overflow-hidden pt-32 pb-24">
+      <div className="absolute -top-32 -right-32 -z-10 size-[480px] rounded-full bg-coral-light/20 blur-[140px]" />
+      <div className="mx-auto max-w-7xl px-6">
+        <div className="flex flex-col gap-16 lg:flex-row lg:items-center">
+          <div className="flex-1 lg:max-w-[60%]">
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-coral-light/10 px-3 py-1 ring-1 ring-coral-light/20">
+              <Sparkles className="size-3.5 shrink-0 text-coral-mid" />
+              <span className="text-xs font-semibold tracking-wider text-coral-mid uppercase">
+                Powered by AI
+              </span>
+            </div>
+            <h1 className="text-balance font-heading text-5xl leading-[1.05] font-medium text-foreground md:text-7xl lg:max-w-[15ch]">
+              Social media posting, made{' '}
+              <span className="font-semibold text-coral-mid italic">effortless</span>
+            </h1>
+            <p className="mt-8 max-w-[48ch] text-pretty text-lg text-muted-foreground md:text-xl">
+              Generate studio-quality posts, images, and high-engagement reels with AI. Schedule
+              directly to Buffer for Instagram and Facebook in seconds.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 rounded-full bg-coral-mid py-3 pr-6 pl-5 text-base font-medium text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
+              >
+                Get started free
+                <ArrowRight className="size-4 shrink-0" />
+              </Link>
+              <a
+                href="#pricing"
+                className="px-6 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                View pricing →
+              </a>
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">No credit card required</p>
           </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
-            Social media posting,{' '}
-            <span className="text-indigo-600">made effortless</span>
-          </h1>
-          <p className="text-lg text-gray-500 mb-8 max-w-xl mx-auto leading-relaxed">
-            Create AI-generated posts, images, and reels for your clients. Schedule them to Buffer in minutes — not hours.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              href="/login"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors"
-            >
-              Get started free
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-            <Link
-              href="/pricing"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
-            >
-              View pricing
-            </Link>
-          </div>
-          <p className="text-xs text-gray-400 mt-4">No credit card required • Free plan available</p>
-        </div>
-      </section>
 
-      {/* Features */}
-      <section className="py-16 sm:py-20 px-4 sm:px-6 bg-gray-50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Everything you need to post smarter</h2>
-            <p className="text-gray-500 max-w-xl mx-auto">From finding the right topic to publishing — Soshio handles the entire workflow.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="bg-white rounded-2xl border border-gray-100 p-6">
-                <div className="w-9 h-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mb-4">
-                  {f.icon}
+          <div className="relative flex-1 lg:max-w-[40%]">
+            <div className="relative translate-y-4 rotate-2 transition-transform duration-700 hover:rotate-0">
+              <Image
+                src="/hero-post.jpg"
+                alt="AI generated Instagram post preview"
+                width={800}
+                height={1000}
+                className="aspect-[4/5] w-full rounded-3xl object-cover shadow-2xl ring-1 ring-black/5"
+              />
+              <div className="absolute top-1/2 -left-8 w-52 -translate-y-1/2 -rotate-6 rounded-2xl bg-card p-4 shadow-xl ring-1 ring-black/5 md:-left-12">
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="size-2 rounded-full bg-coral-light" />
+                  <div className="h-2 w-12 rounded-full bg-muted" />
+                  <span className="ml-auto text-[9px] font-bold tracking-widest text-coral-mid uppercase">
+                    Queued
+                  </span>
                 </div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">{f.title}</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">{f.description}</p>
+                <div className="space-y-2">
+                  <div className="h-2 w-full rounded-full bg-muted" />
+                  <div className="h-2 w-4/5 rounded-full bg-muted" />
+                  <div className="h-2 w-3/5 rounded-full bg-muted" />
+                </div>
+                <div className="mt-3 flex items-center gap-2 text-[10px] font-medium text-muted-foreground">
+                  <CalendarClock className="size-3" />
+                  Tomorrow · 9:00 AM
+                </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
+  );
+}
 
-      {/* Pricing preview */}
-      <section className="py-16 sm:py-20 px-4 sm:px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Simple pricing</h2>
-          <p className="text-gray-500 mb-10">Start free. Upgrade when you're ready.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-            {/* Free */}
-            <div className="border border-gray-200 rounded-2xl p-6">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Free</p>
-              <p className="text-3xl font-bold text-gray-900 mb-1">$0</p>
-              <p className="text-xs text-gray-400 mb-5">Forever free</p>
-              <ul className="space-y-2 text-sm text-gray-600 mb-6">
-                <li className="flex items-center gap-2"><span className="text-green-500">✓</span> 1 workspace</li>
-                <li className="flex items-center gap-2"><span className="text-green-500">✓</span> 5 posts per month</li>
-                <li className="flex items-center gap-2"><span className="text-green-500">✓</span> AI post copy</li>
-                <li className="flex items-center gap-2"><span className="text-green-500">✓</span> Trend search</li>
+function Features() {
+  return (
+    <section id="features" className="bg-muted py-24">
+      <div className="mx-auto max-w-7xl px-6">
+        <div className="mb-16 flex items-end justify-between gap-8">
+          <div className="max-w-[56ch]">
+            <span className="text-xs font-semibold tracking-widest text-coral-mid uppercase">
+              Workflow
+            </span>
+            <h2 className="mt-3 font-heading text-4xl font-medium tracking-tight md:text-5xl">
+              Everything you need to post smarter
+            </h2>
+          </div>
+          <div className="hidden text-right lg:block">
+            <span className="font-heading text-7xl font-medium text-coral-light/30">01</span>
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <FeatureCard
+            icon={<Layers className="size-4" />}
+            title="Multi-workspace"
+            body="Manage multiple brands or client accounts from a single unified dashboard without switching logins."
+          />
+
+          <div className="relative overflow-hidden rounded-[20px] bg-deep-purple p-8 ring-1 ring-black/5 md:col-span-2">
+            <div className="flex h-full flex-col justify-between gap-8 lg:flex-row lg:items-center">
+              <div className="max-w-[35ch]">
+                <div className="mb-6 flex size-10 items-center justify-center rounded-xl bg-white/10 text-white">
+                  <Wand2 className="size-4" />
+                </div>
+                <h3 className="mb-3 font-heading text-xl font-medium text-white">
+                  AI-powered content
+                </h3>
+                <p className="text-pretty text-sm leading-relaxed text-white/70">
+                  Stop staring at a blank screen. Our models generate context-aware captions,
+                  hashtags, and visuals tailored to your brand voice.
+                </p>
+              </div>
+              <Image
+                src="/ai-interface.jpg"
+                alt="AI generation interface"
+                width={800}
+                height={512}
+                className="h-32 w-full rounded-xl object-cover ring-1 ring-white/10 lg:w-64"
+              />
+            </div>
+          </div>
+
+          <FeatureCard
+            icon={<CalendarClock className="size-4" />}
+            title="Buffer scheduling"
+            body="Seamlessly push your approved posts directly to your Buffer queue for automated publishing."
+            accent
+          />
+          <FeatureCard
+            icon={<TrendingUp className="size-4" />}
+            title="Trend-aware topics"
+            body="Stay relevant with daily suggestions based on what's currently viral in your specific industry niche."
+            tone="muted"
+          />
+          <FeatureCard
+            icon={<Languages className="size-4" />}
+            title="Multilingual EN/中文"
+            body="Localize your global presence with perfect translations in English and Chinese, tailored for cultural nuance."
+          />
+          <FeatureCard
+            icon={<Film className="size-4" />}
+            title="AI video reels"
+            body="Transform text prompts into short-form video content complete with transitions and AI-selected music."
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FeatureCard({
+  icon,
+  title,
+  body,
+  accent,
+  tone = 'white',
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  accent?: boolean;
+  tone?: 'white' | 'muted';
+}) {
+  const bg = tone === 'muted' ? 'bg-muted' : 'bg-card';
+  return (
+    <div className={`group relative overflow-hidden rounded-[20px] ${bg} p-8 ring-1 ring-black/5 transition-transform hover:-translate-y-1`}>
+      <div
+        className={`mb-6 flex size-10 items-center justify-center rounded-xl ${
+          accent ? 'bg-coral-mid text-white' : 'bg-coral-light/10 text-coral-mid'
+        }`}
+      >
+        {icon}
+      </div>
+      <h3 className={`mb-3 font-heading text-lg font-medium ${accent ? 'text-coral-dark' : ''}`}>
+        {title}
+      </h3>
+      <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{body}</p>
+    </div>
+  );
+}
+
+function Pricing() {
+  return (
+    <section id="pricing" className="py-24">
+      <div className="mx-auto max-w-7xl px-6">
+        <div className="grid items-start gap-12 lg:grid-cols-12">
+          <div className="lg:col-span-5">
+            <span className="text-xs font-semibold tracking-widest text-coral-mid uppercase">
+              Pricing
+            </span>
+            <h2 className="mt-3 text-balance font-heading text-4xl leading-tight font-medium md:text-5xl">
+              Simple pricing for growing creators
+            </h2>
+            <p className="mt-6 max-w-[42ch] text-pretty text-muted-foreground">
+              Start for free and scale as your audience grows. No hidden fees — just pure
+              creativity.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-6 lg:col-span-7 sm:flex-row">
+            <div className="flex-1 rounded-[24px] bg-card p-8 ring-1 ring-black/5">
+              <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                Free
+              </span>
+              <div className="mt-4 flex items-baseline gap-1">
+                <span className="font-heading text-5xl font-medium tracking-tight">$0</span>
+                <span className="text-sm text-muted-foreground">/mo</span>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">Forever free</p>
+              <ul className="mt-8 space-y-4 text-sm text-muted-foreground">
+                {['1 workspace', '5 posts per month', 'AI post copy', 'Trend search'].map((f) => (
+                  <li key={f} className="flex items-center gap-2">
+                    <Check className="size-4 text-muted-foreground/50" />
+                    {f}
+                  </li>
+                ))}
               </ul>
-              <Link href="/login" className="block w-full py-2 text-center border border-gray-200 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">
+              <Link
+                href="/login"
+                className="mt-10 block w-full rounded-full bg-muted py-2.5 text-center text-sm font-medium ring-1 ring-black/5 transition-colors hover:bg-muted/70"
+              >
                 Get started
               </Link>
             </div>
-            {/* Pro */}
-            <div className="border-2 border-indigo-600 rounded-2xl p-6 relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-semibold text-white bg-indigo-600 px-3 py-0.5 rounded-full">Most popular</div>
-              <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Pro</p>
-              <p className="text-3xl font-bold text-gray-900 mb-1">$29</p>
-              <p className="text-xs text-gray-400 mb-5">per month</p>
-              <ul className="space-y-2 text-sm text-gray-600 mb-6">
-                <li className="flex items-center gap-2"><span className="text-green-500">✓</span> Unlimited workspaces</li>
-                <li className="flex items-center gap-2"><span className="text-green-500">✓</span> Unlimited posts</li>
-                <li className="flex items-center gap-2"><span className="text-green-500">✓</span> AI images & video reels</li>
-                <li className="flex items-center gap-2"><span className="text-green-500">✓</span> Priority support</li>
+
+            <div className="relative flex-1 rounded-[24px] bg-coral-mid p-8 text-white shadow-2xl">
+              <div className="absolute -top-3 right-8 rounded-full bg-deep-purple px-3 py-1 text-[10px] font-semibold tracking-wider uppercase">
+                Most popular
+              </div>
+              <span className="text-xs font-semibold tracking-widest text-white/70 uppercase">
+                Pro
+              </span>
+              <div className="mt-4 flex items-baseline gap-1">
+                <span className="font-heading text-5xl font-medium tracking-tight">$29</span>
+                <span className="text-sm text-white/70">/mo</span>
+              </div>
+              <p className="mt-2 text-sm text-white/70">Billed monthly</p>
+              <ul className="mt-8 space-y-4 text-sm">
+                {[
+                  'Unlimited workspaces',
+                  'Unlimited posts',
+                  'AI images & video reels',
+                  'Priority support',
+                ].map((f) => (
+                  <li key={f} className="flex items-center gap-2">
+                    <Check className="size-4" />
+                    {f}
+                  </li>
+                ))}
               </ul>
-              <Link href="/login" className="block w-full py-2 text-center bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors">
+              <Link
+                href="/login"
+                className="mt-10 block w-full rounded-full bg-white py-2.5 text-center text-sm font-medium text-coral-mid shadow-xl transition-transform active:scale-95"
+              >
                 Start free trial
               </Link>
             </div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
+  );
+}
 
-      {/* CTA */}
-      <section className="py-16 px-4 sm:px-6 bg-indigo-600 text-white text-center">
-        <h2 className="text-2xl sm:text-3xl font-bold mb-3">Ready to post smarter?</h2>
-        <p className="text-indigo-200 mb-6">Join businesses already saving hours every week with Soshio.</p>
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-white text-indigo-700 font-semibold rounded-xl hover:bg-indigo-50 transition-colors"
-        >
-          Get started free
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 px-4 sm:px-6 border-t border-gray-100">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center">
-              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <span className="text-sm font-semibold text-gray-900">Soshio</span>
-          </div>
-          <div className="flex items-center gap-6 text-xs text-gray-400">
-            <Link href="/pricing" className="hover:text-gray-600 transition-colors">Pricing</Link>
-            <Link href="/login" className="hover:text-gray-600 transition-colors">Sign in</Link>
-            <span>© {new Date().getFullYear()} Soshio</span>
+function FinalCTA() {
+  return (
+    <section className="mx-auto max-w-7xl px-6 pb-24">
+      <div className="relative overflow-hidden rounded-[32px] bg-zinc-900 px-8 py-20 text-center">
+        <div className="relative z-10 mx-auto max-w-2xl">
+          <h2 className="font-heading text-4xl font-medium text-white md:text-5xl">
+            Ready to reclaim your time?
+          </h2>
+          <p className="mt-4 text-zinc-400">
+            Join the businesses already saving hours every week with Soshio.
+          </p>
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-full bg-coral-mid py-3 pr-6 pl-5 text-base font-medium text-white transition-transform hover:-translate-y-0.5"
+            >
+              Get started free
+              <ArrowRight className="size-4" />
+            </Link>
+            <span className="text-sm text-zinc-500">No credit card required</span>
           </div>
         </div>
-      </footer>
-    </div>
+        <div className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-coral-mid/20 blur-[100px]" />
+        <div className="pointer-events-none absolute -bottom-24 -left-24 size-96 rounded-full bg-deep-purple/40 blur-[100px]" />
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="border-t border-border py-12">
+      <div className="mx-auto max-w-7xl px-6">
+        <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
+          <div>
+            <span className="font-heading text-lg font-semibold tracking-tight text-deep-purple">
+              Soshio
+            </span>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Effortless social posting for creators.
+            </p>
+          </div>
+          <div className="flex gap-8">
+            <Link href="/pricing" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              Pricing
+            </Link>
+            <Link href="/login" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              Sign in
+            </Link>
+          </div>
+        </div>
+        <div className="mt-12 text-xs text-muted-foreground">
+          © {new Date().getFullYear()} Soshio. All rights reserved.
+        </div>
+      </div>
+    </footer>
   );
 }
